@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ML Model Weights
+*.pt
+*.onnx
+*.pth
+*.safetensors
+
+# Data & Uploads
+uploads/
+*.ifc
+*.frag
+
+# Docker volumes
+docker-data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+tmp/

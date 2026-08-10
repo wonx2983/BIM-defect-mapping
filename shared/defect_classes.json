@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "classes": [
+    {
+      "id": 0,
+      "name": "crack",
+      "display_name": "Crack",
+      "description": "Structural, hairline, or pattern cracking in concrete or masonry",
+      "base_severity_weight": 0.6,
+      "color": "#EF4444"
+    },
+    {
+      "id": 1,
+      "name": "spalling",
+      "display_name": "Spalling",
+      "description": "Surface deterioration, flaking, or delamination of concrete",
+      "base_severity_weight": 0.7,
+      "color": "#F97316"
+    },
+    {
+      "id": 2,
+      "name": "exposed_rebar",
+      "display_name": "Exposed Rebar",
+      "description": "Visible reinforcement steel due to concrete cover loss",
+      "base_severity_weight": 0.9,
+      "color": "#DC2626"
+    },
+    {
+      "id": 3,
+      "name": "corrosion",
+      "display_name": "Corrosion",
+      "description": "Rust staining or active corrosion of reinforcement or steel elements",
+      "base_severity_weight": 0.85,
+      "color": "#B45309"
+    },
+    {
+      "id": 4,
+      "name": "water_seepage",
+      "display_name": "Water Seepage",
+      "description": "Moisture ingress, water staining, or efflorescence",
+      "base_severity_weight": 0.5,
+      "color": "#3B82F6"
+    },
+    {
+      "id": 5,
+      "name": "honeycombing",
+      "display_name": "Honeycombing",
+      "description": "Voids and air pockets in concrete due to improper compaction",
+      "base_severity_weight": 0.75,
+      "color": "#A855F7"
+    }
+  ],
+  "severity_levels": [
+    {"id": 0, "name": "low", "display_name": "Low", "color": "#22C55E", "score_range": [0.0, 0.25]},
+    {"id": 1, "name": "medium", "display_name": "Medium", "color": "#EAB308", "score_range": [0.25, 0.5]},
+    {"id": 2, "name": "high", "display_name": "High", "color": "#F97316", "score_range": [0.5, 0.75]},
+    {"id": 3, "name": "critical", "display_name": "Critical", "color": "#EF4444", "score_range": [0.75, 1.0]}
+  ]
+}
