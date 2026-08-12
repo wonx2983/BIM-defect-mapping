@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { FolderKanban, ScanSearch, AlertTriangle, ClipboardList, ArrowUpRight, Box, Upload } from 'lucide-react';
 import styles from './dashboard.module.css';
 
 const SEVERITY_DATA = [
-  { name: 'Low', value: 18, color: 'hsl(142, 71%, 45%)' },
-  { name: 'Medium', value: 15, color: 'hsl(45, 93%, 47%)' },
-  { name: 'High', value: 11, color: 'hsl(25, 95%, 53%)' },
-  { name: 'Critical', value: 3, color: 'hsl(0, 84%, 60%)' },
+  { name: 'Low', value: 18, color: 'hsl(152, 30%, 45%)' },
+  { name: 'Medium', value: 15, color: 'hsl(40, 45%, 48%)' },
+  { name: 'High', value: 11, color: 'hsl(25, 50%, 48%)' },
+  { name: 'Critical', value: 3, color: 'hsl(0, 45%, 50%)' },
 ];
 
 const TREND_DATA = [
@@ -22,11 +23,18 @@ const TREND_DATA = [
 ];
 
 const ACTIVITIES = [
-  { text: 'Critical crack detected in Building A - 3rd Floor', time: '2 min ago', color: 'hsl(0, 84%, 60%)' },
-  { text: 'Defect #42 resolved by John Doe', time: '15 min ago', color: 'hsl(142, 71%, 45%)' },
-  { text: 'New inspection started: North Wing Survey', time: '1 hour ago', color: 'hsl(210, 100%, 56%)' },
-  { text: 'BIM model updated: Tower B Foundation', time: '3 hours ago', color: 'hsl(280, 67%, 55%)' },
-  { text: 'Report generated: Weekly Summary', time: '5 hours ago', color: 'hsl(45, 93%, 47%)' },
+  { text: 'Critical crack detected in Building A — 3rd Floor', time: '2 min ago', severity: 'critical' },
+  { text: 'Defect #42 resolved by John Doe', time: '15 min ago', severity: 'resolved' },
+  { text: 'New inspection started: North Wing Survey', time: '1 hour ago', severity: 'info' },
+  { text: 'BIM model updated: Tower B Foundation', time: '3 hours ago', severity: 'info' },
+  { text: 'Report generated: Weekly Summary', time: '5 hours ago', severity: 'info' },
+];
+
+const STAT_CARDS = [
+  { icon: FolderKanban, label: 'Total Projects', value: '12', trend: '+3 this month', positive: true },
+  { icon: ScanSearch, label: 'Active Defects', value: '47', trend: '-5 resolved this week', positive: true },
+  { icon: AlertTriangle, label: 'Critical Alerts', value: '3', trend: 'Requires attention', positive: false },
+  { icon: ClipboardList, label: 'Inspections', value: '28', trend: '+8 this month', positive: true },
 ];
 
 export default function DashboardPage() {
@@ -36,41 +44,23 @@ export default function DashboardPage() {
     <div className={styles.grid}>
       {/* Stats Row */}
       <div className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statIcon}>📁</span>
-            <span className={styles.statLabel}>Total Projects</span>
-          </div>
-          <div className={styles.statValue}>12</div>
-          <div className={styles.statTrend}>+3 this month</div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statIcon}>🔍</span>
-            <span className={styles.statLabel}>Active Defects</span>
-          </div>
-          <div className={styles.statValue}>47</div>
-          <div className={styles.statTrend}>-5 resolved this week</div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statIcon}>🚨</span>
-            <span className={styles.statLabel}>Critical Alerts</span>
-          </div>
-          <div className={`${styles.statValue} ${styles.statPulse}`}>3</div>
-          <div className={`${styles.statTrend} ${styles.negative}`}>Requires attention</div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statHeader}>
-            <span className={styles.statIcon}>📋</span>
-            <span className={styles.statLabel}>Inspections</span>
-          </div>
-          <div className={styles.statValue}>28</div>
-          <div className={styles.statTrend}>+8 this month</div>
-        </div>
+        {STAT_CARDS.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className={styles.statCard}>
+              <div className={styles.statHeader}>
+                <Icon size={16} strokeWidth={1.5} className={styles.statIconSvg} />
+                <span className={styles.statLabel}>{stat.label}</span>
+              </div>
+              <div className={`${styles.statValue} ${!stat.positive && stat.label === 'Critical Alerts' ? styles.statPulse : ''}`}>
+                {stat.value}
+              </div>
+              <div className={`${styles.statTrend} ${!stat.positive ? styles.negative : ''}`}>
+                {stat.trend}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Charts Row */}
@@ -85,7 +75,7 @@ export default function DashboardPage() {
                 cy="50%"
                 innerRadius={65}
                 outerRadius={95}
-                paddingAngle={4}
+                paddingAngle={3}
                 dataKey="value"
                 strokeWidth={0}
               >
@@ -93,19 +83,19 @@ export default function DashboardPage() {
                   <Cell key={index} fill={entry.color} />
                 ))}
               </Pie>
-              <text x="50%" y="48%" textAnchor="middle" fill="hsl(210, 40%, 98%)" fontSize="28" fontWeight="700">
+              <text x="50%" y="48%" textAnchor="middle" fill="hsl(0, 0%, 93%)" fontSize="24" fontWeight="600">
                 {total}
               </text>
-              <text x="50%" y="60%" textAnchor="middle" fill="hsl(215, 20%, 65%)" fontSize="12">
+              <text x="50%" y="60%" textAnchor="middle" fill="hsl(0, 0%, 44%)" fontSize="11">
                 Total Defects
               </text>
             </PieChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '8px' }}>
             {SEVERITY_DATA.map((d) => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
-                <span style={{ color: 'hsl(215, 20%, 65%)' }}>{d.name}: {d.value}</span>
+              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: d.color }} />
+                <span style={{ color: 'hsl(0, 0%, 44%)' }}>{d.name}: {d.value}</span>
               </div>
             ))}
           </div>
@@ -117,27 +107,27 @@ export default function DashboardPage() {
             <AreaChart data={TREND_DATA}>
               <defs>
                 <linearGradient id="colorDefects" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(210, 100%, 56%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(210, 100%, 56%)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(0, 0%, 44%)" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="hsl(0, 0%, 44%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(217, 33%, 17%)" />
-              <XAxis dataKey="month" stroke="hsl(215, 20%, 45%)" fontSize={12} tickLine={false} />
-              <YAxis stroke="hsl(215, 20%, 45%)" fontSize={12} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(0, 0%, 15%)" />
+              <XAxis dataKey="month" stroke="hsl(0, 0%, 30%)" fontSize={11} tickLine={false} />
+              <YAxis stroke="hsl(0, 0%, 30%)" fontSize={11} tickLine={false} />
               <Tooltip
                 contentStyle={{
-                  background: 'hsl(222, 47%, 11%)',
-                  border: '1px solid hsl(217, 33%, 17%)',
-                  borderRadius: '10px',
-                  color: 'hsl(210, 40%, 98%)',
-                  fontSize: '13px',
+                  background: 'hsl(0, 0%, 9%)',
+                  border: '1px solid hsl(0, 0%, 15%)',
+                  borderRadius: '8px',
+                  color: 'hsl(0, 0%, 93%)',
+                  fontSize: '12px',
                 }}
               />
               <Area
                 type="monotone"
                 dataKey="defects"
-                stroke="hsl(210, 100%, 56%)"
-                strokeWidth={2}
+                stroke="hsl(0, 0%, 50%)"
+                strokeWidth={1.5}
                 fill="url(#colorDefects)"
               />
             </AreaChart>
@@ -148,19 +138,22 @@ export default function DashboardPage() {
       {/* Quick Actions */}
       <div className={styles.actionsRow}>
         <Link href="/detect" className={styles.actionCard}>
-          <div className={styles.actionIcon}>🔍</div>
+          <ScanSearch size={24} strokeWidth={1.5} className={styles.actionIconSvg} />
           <div className={styles.actionLabel}>New Inspection</div>
           <div className={styles.actionDesc}>Upload images and detect defects</div>
+          <ArrowUpRight size={14} className={styles.actionArrow} />
         </Link>
         <Link href="/detect" className={styles.actionCard}>
-          <div className={styles.actionIcon}>📷</div>
+          <Upload size={24} strokeWidth={1.5} className={styles.actionIconSvg} />
           <div className={styles.actionLabel}>Upload Images</div>
           <div className={styles.actionDesc}>Batch process site photographs</div>
+          <ArrowUpRight size={14} className={styles.actionArrow} />
         </Link>
         <Link href="/viewer" className={styles.actionCard}>
-          <div className={styles.actionIcon}>🏗️</div>
+          <Box size={24} strokeWidth={1.5} className={styles.actionIconSvg} />
           <div className={styles.actionLabel}>Open BIM Viewer</div>
           <div className={styles.actionDesc}>View 3D model with defect markers</div>
+          <ArrowUpRight size={14} className={styles.actionArrow} />
         </Link>
       </div>
 
@@ -169,7 +162,7 @@ export default function DashboardPage() {
         <h3 className={styles.chartTitle}>Recent Activity</h3>
         {ACTIVITIES.map((item, i) => (
           <div key={i} className={styles.activityItem}>
-            <div className={styles.activityDot} style={{ background: item.color }} />
+            <div className={`${styles.activityDot} ${styles[`dot_${item.severity}`]}`} />
             <span className={styles.activityText}>{item.text}</span>
             <span className={styles.activityTime}>{item.time}</span>
           </div>

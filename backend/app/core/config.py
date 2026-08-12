@@ -12,9 +12,13 @@ class Settings(BaseSettings):
     DATABASE_URL_SYNC: str = "postgresql+psycopg://defectsync:defectsync_dev@localhost:5432/defectsync"
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "rediss://default:xxx@xxx.upstash.io:6379"
 
-    # MinIO / S3
+    # Storage — "local" or "s3"
+    STORAGE_BACKEND: str = "local"
+    LOCAL_UPLOAD_DIR: str = "uploads"
+
+    # MinIO / S3 (only used when STORAGE_BACKEND=s3)
     S3_ENDPOINT: str = "http://localhost:9000"
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin"
@@ -44,12 +48,18 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        "extra": "ignore",
     }
 
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ORIGINS comma-separated string into a list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def is_local_storage(self) -> bool:
+        """Check if using local filesystem storage."""
+        return self.STORAGE_BACKEND == "local"
 
 
 @lru_cache

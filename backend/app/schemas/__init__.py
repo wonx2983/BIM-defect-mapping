@@ -18,6 +18,12 @@ from app.schemas.defect import (
     DefectUpdate,
     DefectListResponse,
 )
+from app.schemas.detection import (
+    DetectionResponse,
+    BatchDetectionStatus,
+    DetectionConfigResponse,
+    DetectionConfigUpdate,
+)
 
 __all__ = [
     "LoginRequest",
@@ -32,4 +38,8 @@ __all__ = [
     "DefectResponse",
     "DefectUpdate",
     "DefectListResponse",
+    "DetectionResponse",
+    "BatchDetectionStatus",
+    "DetectionConfigResponse",
+    "DetectionConfigUpdate",
 ]

@@ -1,12 +1,17 @@
 """DefectSync — FastAPI Application Entry Point."""
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.projects import router as projects_router
+from app.api.v1.detection import router as detection_router
+from app.api.v1.defects import router as defects_router
 
 settings = get_settings()
 
@@ -33,6 +38,14 @@ register_exception_handlers(app)
 # Routers
 app.include_router(auth_router)
 app.include_router(projects_router)
+app.include_router(detection_router)
+app.include_router(defects_router)
+
+# Serve uploaded files as static assets (local storage mode)
+if settings.is_local_storage:
+    uploads_dir = Path(__file__).resolve().parents[1] / settings.LOCAL_UPLOAD_DIR
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
 @app.get("/health", tags=["System"])

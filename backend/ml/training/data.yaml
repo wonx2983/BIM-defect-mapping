@@ -1,0 +1,34 @@
+# DefectSync — YOLOv11 Dataset Configuration
+# Download datasets from Roboflow Universe in YOLOv11 format
+# and extract to the paths below.
+#
+# Recommended datasets:
+#   - "Concrete Defects" (crack, spalling, rebar)
+#   - "GYU-DET" (bridge surface defects)
+#   - SDNET2018 (concrete cracks)
+#
+# After downloading, ensure the folder structure is:
+#   backend/ml/data/
+#     train/
+#       images/
+#       labels/
+#     valid/
+#       images/
+#       labels/
+#     test/           (optional)
+#       images/
+#       labels/
+
+path: ml/data
+train: train/images
+val: valid/images
+test: test/images
+
+# 6-class defect taxonomy (matches shared/defect_classes.json)
+names:
+  0: crack
+  1: spalling
+  2: exposed_rebar
+  3: corrosion
+  4: water_seepage
+  5: honeycombing

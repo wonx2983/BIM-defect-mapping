@@ -1,7 +1,9 @@
+import { Box } from 'lucide-react';
+
 export default function ViewerPage() {
   return (
     <div className="empty-state">
-      <div className="empty-state-icon">🏗️</div>
+      <div className="empty-state-icon"><Box size={32} strokeWidth={1.5} /></div>
       <h2 className="empty-state-title">BIM Viewer</h2>
       <p className="empty-state-description">
         View 3D BIM models with defect markers, element picking, and spatial mapping.

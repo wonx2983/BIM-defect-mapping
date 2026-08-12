@@ -1,5 +1,6 @@
 'use client';
 
+import { Search, Bell } from 'lucide-react';
 import styles from './Topbar.module.css';
 
 interface TopbarProps {
@@ -13,19 +14,18 @@ export default function Topbar({ title }: TopbarProps) {
 
       <div className={styles.actions}>
         <div className={styles.searchBox}>
-          <span className={styles.searchIcon}>🔎</span>
+          <Search size={14} strokeWidth={1.5} className={styles.searchIcon} />
           <input
             className={styles.searchInput}
             type="text"
             placeholder="Search..."
             aria-label="Search"
           />
-          <span className={styles.shortcutHint}>⌘K</span>
+          <kbd className={styles.shortcutHint}>⌘K</kbd>
         </div>
 
         <button className={styles.notifBtn} aria-label="Notifications">
-          🔔
-          <span className={styles.notifDot} />
+          <Bell size={18} strokeWidth={1.5} />
         </button>
       </div>
     </header>

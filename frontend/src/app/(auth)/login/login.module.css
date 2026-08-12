@@ -1,14 +1,12 @@
 .container {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   animation: slideUp 500ms ease-out;
 }
 
 .card {
-  background: hsla(222, 47%, 11%, 0.6);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid hsla(217, 33%, 25%, 0.5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: 40px;
 }
@@ -22,34 +20,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .logoIcon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary), hsl(280, 100%, 65%));
+  background: var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 16px;
-  color: white;
+  font-size: 14px;
+  color: var(--color-bg);
+  letter-spacing: -0.02em;
 }
 
 .logoText {
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 700;
-  background: linear-gradient(135deg, var(--color-text), var(--color-primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-text);
+  letter-spacing: -0.03em;
 }
 
 .subtitle {
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
 
@@ -60,8 +57,8 @@
 }
 
 .error {
-  background: hsla(0, 84%, 60%, 0.1);
-  border: 1px solid hsla(0, 84%, 60%, 0.3);
+  background: var(--color-critical-bg);
+  border: 1px solid hsla(0, 45%, 50%, 0.2);
   color: var(--color-critical);
   padding: 10px 14px;
   border-radius: var(--radius-md);
@@ -71,12 +68,12 @@
 
 .submitBtn {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: white;
-  background: var(--color-primary);
+  color: var(--color-bg);
+  background: var(--color-text);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -88,12 +85,11 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  box-shadow: 0 0 24px var(--color-primary-glow);
+  background: hsl(0, 0%, 82%);
 }
 
 .submitBtn:disabled {
-  opacity: 0.6;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -101,14 +97,14 @@
   text-align: center;
   margin-top: 24px;
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
 }
 
 .footer a {
-  color: var(--color-primary);
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .footer a:hover {
-  text-decoration: underline;
+  color: var(--color-text);
 }

@@ -4,9 +4,7 @@
   top: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  background: hsla(222, 47%, 8%, 0.85);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: var(--color-bg-secondary);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -23,36 +21,35 @@
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 20px;
   border-bottom: 1px solid var(--color-border);
   min-height: 65px;
 }
 
 .logoIcon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary), hsl(280, 100%, 65%));
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 14px;
-  color: white;
+  font-size: 12px;
+  color: var(--color-bg);
   flex-shrink: 0;
+  letter-spacing: -0.02em;
 }
 
 .logoText {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: 700;
-  background: linear-gradient(135deg, var(--color-text), var(--color-primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--color-text);
   white-space: nowrap;
   opacity: 1;
   transition: opacity 200ms;
+  letter-spacing: -0.03em;
 }
 
 .collapsed .logoText {
@@ -66,41 +63,37 @@
   padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   overflow-y: auto;
 }
 
 .navItem {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
   text-decoration: none;
   white-space: nowrap;
-  border-left: 3px solid transparent;
-  margin-left: -3px;
 }
 
 .navItem:hover {
   background: var(--color-surface-hover);
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .navItem.active {
-  background: var(--color-primary-muted);
-  color: var(--color-primary);
-  border-left-color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .navIcon {
-  font-size: 18px;
-  width: 24px;
+  width: 20px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -117,25 +110,26 @@
 
 /* User section */
 .userSection {
-  padding: 16px;
+  padding: 14px;
   border-top: 1px solid var(--color-border);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--color-primary), hsl(280, 100%, 65%));
+  background: var(--color-surface-active);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 13px;
-  color: white;
+  font-size: 11px;
+  color: var(--color-text-secondary);
   flex-shrink: 0;
+  border: 1px solid var(--color-border);
 }
 
 .userInfo {
@@ -151,7 +145,7 @@
 }
 
 .userName {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-text);
   white-space: nowrap;
@@ -160,7 +154,7 @@
 }
 
 .userRole {
-  font-size: var(--text-xs);
+  font-size: 10px;
   color: var(--color-text-muted);
   text-transform: capitalize;
 }
@@ -172,38 +166,38 @@
   cursor: pointer;
   padding: 6px;
   border-radius: var(--radius-sm);
-  font-size: 16px;
   transition: all var(--transition-fast);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .logoutBtn:hover {
   background: var(--color-surface-hover);
-  color: var(--color-error);
+  color: var(--color-text-secondary);
 }
 
 /* Toggle */
 .toggleBtn {
   position: absolute;
   top: 22px;
-  right: -14px;
-  width: 28px;
-  height: 28px;
+  right: -12px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   transition: all var(--transition-fast);
   z-index: 101;
 }
 
 .toggleBtn:hover {
   background: var(--color-surface-hover);
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   border-color: var(--color-border-hover);
 }
