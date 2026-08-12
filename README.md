@@ -46,9 +46,9 @@ A professional-grade, production-ready platform for real-time construction defec
 ┌──────────────────────────┴──────────────────────────────────────────┐
 │                        DATA / INFRA LAYER                           │
 │  ┌──────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │PostgreSQL│  │ Redis        │  │ S3/MinIO     │  │ ML Model   │ │
-│  │ (+ RLS)  │  │ (Cache +     │  │ (Files, IFC, │  │ Registry   │ │
-│  │          │  │  Task Queue) │  │  Images)     │  │            │ │
+│  │Neon DB   │  │ Upstash      │  │ Local/Cloud  │  │ ML Model   │ │
+│  │(Postgres)│  │ (Redis)      │  │ (Files, IFC, │  │ Registry   │ │
+│  │          │  │              │  │  Images)     │  │            │ │
 │  └──────────┘  └──────────────┘  └──────────────┘  └────────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -90,9 +90,9 @@ A professional-grade, production-ready platform for real-time construction defec
 ## Getting Started
 
 ### Prerequisites
-- Docker & Docker Compose
-- Python 3.11+ (for local ML training)
+- Python 3.11+ (for local ML training & Backend)
 - Node.js 18+ (for local frontend dev)
+- Accounts on [Neon](https://neon.tech) and [Upstash](https://upstash.com) for database/redis
 
 ### Installation
 
@@ -102,11 +102,22 @@ git clone https://github.com/wonx2983/BIM-defect-mapping.git
 cd BIM-defect-mapping
 ```
 
-2. Start the services using Docker Compose
+2. Setup Backend (FastAPI)
 ```bash
-docker-compose up -d
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-3. Access the application
+3. Setup Frontend (Next.js)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+4. Access the application
 - Frontend: `http://localhost:3000`
 - Backend API Docs: `http://localhost:8000/docs`
