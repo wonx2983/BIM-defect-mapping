@@ -64,10 +64,15 @@ NAME_MAP = {
     "corrosion":                "corrosion",
     "corrosion_stain":          "corrosion",
     "rust":                     "corrosion",
+    "ruststrain":               "corrosion",
+    "rust_stain":               "corrosion",
+    "ruststain":                "corrosion",
     "efflorescence":            "efflorescence",
     "scaling":                  "scaling",
     "honeycombing":             "honeycombing",
     "honeycomb":                "honeycombing",
+    "honeycomb_concrete":       "honeycombing",
+    "honeycomb_in_piller":      "honeycombing",
     "honeycomb_concrete":       "honeycombing",
 }
 
@@ -241,21 +246,33 @@ def download_and_merge(api_key: str, output_dir: Path) -> bool:
     print("=" * 60)
     print("Step 2/3: Downloading Honeycombing dataset (~1,925 images)")
     print("=" * 60)
-    hc_dir = tmp_base / "honeycomb"
-    try:
-        project = rf.workspace("pritha-ghosh-xrgsu").project("honeycomb_defect_detection")
-        version = project.version(1)
-        version.download("yolov11", location=str(hc_dir), overwrite=True)
-        print("Honeycombing dataset downloaded successfully.")
-    except Exception as e:
-        print(f"ERROR downloading Honeycombing dataset: {e}")
+    # Use a completely separate temp directory to avoid Roboflow conflicts
+    hc_dir = tmp_base / "honeycomb_isolated"
+    hc_dir.mkdir(parents=True, exist_ok=True)
+
+    hc_datasets = [
+        ("pritha-ghosh-xrgsu", "honeycomb_defect_detection", 1, "Pritha Ghosh Honeycomb"),
+        ("pritha-ghosh-xrgsu", "honeycomb_defect_detection", 2, "Pritha Ghosh Honeycomb v2"),
+        ("ag-rf9yl", "honeycomb-concrete", 1, "AG Honeycomb Concrete"),
+    ]
+    hc_downloaded = False
+    for ws, proj, ver, desc in hc_datasets:
         try:
-            version.download("yolov8", location=str(hc_dir), overwrite=True)
-            print("Honeycombing dataset downloaded with YOLOv8 format.")
-        except Exception as e2:
-            print(f"ERROR: Could not download Honeycombing dataset: {e2}")
-            print("Continuing with DEEP dataset only (6 classes).")
-            hc_dir = None
+            print(f"  Trying: {desc} (v{ver})...")
+            hc_project = rf.workspace(ws).project(proj)
+            hc_version = hc_project.version(ver)
+            hc_version.download("yolov8", location=str(hc_dir), overwrite=True)
+            print(f"  Downloaded: {desc}")
+            hc_downloaded = True
+            break
+        except Exception as e:
+            print(f"  Failed: {e}")
+            continue
+
+    if not hc_downloaded:
+        print("WARNING: Could not download any honeycombing dataset.")
+        print("Continuing with DEEP dataset only (6 classes).")
+        hc_dir = None
 
     # ── Step 3: Remap and Merge ────────────────────────────────────
     print()
@@ -296,12 +313,23 @@ def download_and_merge(api_key: str, output_dir: Path) -> bool:
             hc_classes = get_class_names_from_yaml(hc_data)
             print(f"\nHoneycombing classes found: {hc_classes}")
 
-            hc_remap = build_remap_table(hc_classes)
-            print(f"Honeycombing remap table: {hc_remap}")
+            # Validate this is actually a honeycombing dataset
+            hc_class_names_lower = [v.lower() for v in hc_classes.values()]
+            has_honeycomb = any(
+                normalize_class_name(n) == "honeycombing"
+                for n in hc_classes.values()
+            )
+            if not has_honeycomb:
+                print("WARNING: Downloaded dataset does NOT contain honeycombing.")
+                print(f"  Classes found: {list(hc_classes.values())}")
+                print("  Skipping this dataset to avoid duplicates.")
+            else:
+                hc_remap = build_remap_table(hc_classes)
+                print(f"Honeycombing remap table: {hc_remap}")
 
-            hc_root = hc_yaml.parent
-            hc_stats = merge_dataset_into(hc_root, output_dir, hc_remap, prefix="hc_")
-            print(f"Honeycombing merged: {hc_stats['images']} images, {hc_stats['skipped']} skipped")
+                hc_root = hc_yaml.parent
+                hc_stats = merge_dataset_into(hc_root, output_dir, hc_remap, prefix="hc_")
+                print(f"Honeycombing merged: {hc_stats['images']} images, {hc_stats['skipped']} skipped")
         else:
             print("WARNING: No data.yaml found in Honeycombing download.")
 
