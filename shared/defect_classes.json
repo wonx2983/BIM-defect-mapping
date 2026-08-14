@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "classes": [
     {
       "id": 0,
@@ -35,17 +35,25 @@
     },
     {
       "id": 4,
-      "name": "water_seepage",
-      "display_name": "Water Seepage",
-      "description": "Moisture ingress, water staining, or efflorescence",
+      "name": "efflorescence",
+      "display_name": "Efflorescence",
+      "description": "White crystalline deposits on concrete surfaces caused by water migration through the material",
       "base_severity_weight": 0.5,
       "color": "#3B82F6"
     },
     {
       "id": 5,
+      "name": "scaling",
+      "display_name": "Scaling",
+      "description": "Peeling or flaking of the finished concrete surface due to freeze-thaw cycles or chemical exposure",
+      "base_severity_weight": 0.65,
+      "color": "#8B5CF6"
+    },
+    {
+      "id": 6,
       "name": "honeycombing",
       "display_name": "Honeycombing",
-      "description": "Voids and air pockets in concrete due to improper compaction",
+      "description": "Voids and air pockets in concrete due to improper compaction during placement",
       "base_severity_weight": 0.75,
       "color": "#A855F7"
     }

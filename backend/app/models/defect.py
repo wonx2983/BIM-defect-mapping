@@ -18,7 +18,8 @@ class DefectClass(str, enum.Enum):
     SPALLING = "spalling"
     EXPOSED_REBAR = "exposed_rebar"
     CORROSION = "corrosion"
-    WATER_SEEPAGE = "water_seepage"
+    EFFLORESCENCE = "efflorescence"
+    SCALING = "scaling"
     HONEYCOMBING = "honeycombing"
 
 

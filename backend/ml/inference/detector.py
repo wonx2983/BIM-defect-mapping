@@ -76,13 +76,15 @@ class InferenceResult:
 
 
 # Class name mapping (YOLO class index → name)
+# Must match the order in data.yaml used during training.
 CLASS_NAMES = {
     0: "crack",
     1: "spalling",
     2: "exposed_rebar",
     3: "corrosion",
-    4: "water_seepage",
-    5: "honeycombing",
+    4: "efflorescence",
+    5: "scaling",
+    6: "honeycombing",
 }
 
 # Base severity weights per defect type (from defect_classes.json)
@@ -91,7 +93,8 @@ BASE_SEVERITY_WEIGHTS = {
     "spalling": 0.7,
     "exposed_rebar": 0.9,
     "corrosion": 0.85,
-    "water_seepage": 0.5,
+    "efflorescence": 0.5,
+    "scaling": 0.65,
     "honeycombing": 0.75,
 }
 
