@@ -97,7 +97,7 @@ export default function ViewerPage() {
     }).finally(() => setIsLoading(false));
   }, [projectId]);
 
-  // ── 3D Viewer Initialization ──────────────────────────────────────
+  // ── 3D Viewer Initialization (Three.js + web-ifc direct) ────────
   useEffect(() => {
     if (!containerRef.current || viewerReady) return;
 
@@ -105,49 +105,78 @@ export default function ViewerPage() {
 
     async function initViewer() {
       try {
-        const OBC = await import('@thatopen/components');
         const THREE = await import('three');
+        const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
 
         if (disposed || !containerRef.current) return;
 
-        const components = new OBC.Components();
-        const worlds = components.get(OBC.Worlds);
+        const container = containerRef.current;
 
-        const world = worlds.create();
-        world.scene = new OBC.SimpleScene(components);
-        world.renderer = new OBC.SimpleRenderer(components, containerRef.current);
-        world.camera = new OBC.SimpleCamera(components);
+        // Create scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
 
-        components.init();
-        (world.scene as any).setup?.();
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x8d8d8d, 0.5);
+        scene.add(hemiLight);
 
-        // Set camera position
-        (world.camera as any).controls?.setLookAt(20, 20, 20, 0, 0, 0);
+        // Camera
+        const camera = new THREE.PerspectiveCamera(
+          45, container.clientWidth / container.clientHeight, 0.1, 10000
+        );
+        camera.position.set(30, 30, 30);
 
-        // Add grid
-        const grids = components.get(OBC.Grids);
-        grids.create(world);
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
 
-        componentsRef.current = components;
-        worldRef.current = world;
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0, 0);
+        controls.update();
 
-        // Setup fragments manager for IFC loading
-        const fragments = components.get(OBC.FragmentsManager);
-        if (!fragments.initialized) {
-          try {
-            const res = await fetch('/worker.mjs');
-            const blob = await res.blob();
-            const workerUrl = URL.createObjectURL(blob);
-            fragments.init(workerUrl);
-          } catch (e) {
-            console.warn('FragmentsManager init:', e);
-          }
+        // Grid
+        const gridHelper = new THREE.GridHelper(100, 50, 0xcccccc, 0xe0e0e0);
+        scene.add(gridHelper);
+
+        // Raycaster for picking
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Animation loop
+        function animate() {
+          if (disposed) return;
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
         }
-        fragmentsRef.current = fragments;
+        animate();
 
-        // Setup raycaster for element picking
-        const raycasters = components.get(OBC.Raycasters);
-        raycasters.get(world);
+        // Resize handler
+        const handleResize = () => {
+          if (!container) return;
+          camera.aspect = container.clientWidth / container.clientHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(container.clientWidth, container.clientHeight);
+        };
+        window.addEventListener('resize', handleResize);
+        const resizeObserver = new ResizeObserver(handleResize);
+        resizeObserver.observe(container);
+
+        // Store refs
+        componentsRef.current = { scene, camera, renderer, controls, raycaster, mouse, THREE };
+        worldRef.current = { scene: { three: scene }, camera, renderer };
 
         setViewerReady(true);
       } catch (err) {
@@ -161,7 +190,12 @@ export default function ViewerPage() {
     return () => {
       disposed = true;
       if (componentsRef.current) {
-        try { componentsRef.current.dispose(); } catch {}
+        try {
+          componentsRef.current.renderer?.dispose();
+          componentsRef.current.controls?.dispose();
+          const canvas = componentsRef.current.renderer?.domElement;
+          if (canvas?.parentElement) canvas.parentElement.removeChild(canvas);
+        } catch {}
         componentsRef.current = null;
         worldRef.current = null;
         fragmentsRef.current = null;
@@ -203,53 +237,129 @@ export default function ViewerPage() {
     }
   }, []);
 
-  // ── Load IFC Model ────────────────────────────────────────────────
+  // ── Load IFC Model (direct web-ifc + Three.js) ────────────────────
   const loadIFCModel = useCallback(async (model: BIMModel) => {
     if (!componentsRef.current || !worldRef.current) return;
 
     setIsLoading(true);
     setError('');
     try {
-      const OBC = await import('@thatopen/components');
-      const components = componentsRef.current;
+      const THREE = await import('three');
+      const WebIFC = await import('web-ifc');
 
-      const fragments = components.get(OBC.FragmentsManager);
-      if (!fragments.initialized) {
-        try {
-          const res = await fetch('/worker.mjs');
-          const blob = await res.blob();
-          const workerUrl = URL.createObjectURL(blob);
-          fragments.init(workerUrl);
-        } catch (e) {
-          console.warn('FragmentsManager init:', e);
-        }
-      }
+      const { scene, camera, controls } = componentsRef.current;
 
-      const ifcLoader = components.get(OBC.IfcLoader);
-      ifcLoader.settings.autoSetWasm = false;
-      ifcLoader.settings.wasm = {
-        path: '/',
-        absolute: true,
-      };
-      ifcLoader.settings.customLocateFileHandler = (path: string) => `/${path}`;
-      if (ifcLoader.settings.webIfc) {
-        ifcLoader.settings.webIfc.locateFile = (path: string) => `/${path}`;
-      }
-      await ifcLoader.setup();
+      // Initialize web-ifc API
+      const ifcApi = new WebIFC.IfcAPI();
+      ifcApi.SetWasmPath(window.location.origin + '/', true);
+      await ifcApi.Init();
 
-      // Fetch the IFC file
+      // Fetch the IFC file from backend
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${API_BASE}${model.file_url}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) {
-        throw new Error(`Failed to download model file: HTTP ${response.status}`);
+        throw new Error(`Failed to download model: HTTP ${response.status}`);
       }
       const buffer = await response.arrayBuffer();
       const data = new Uint8Array(buffer);
 
-      const ifcModel = await ifcLoader.load(data);
-      worldRef.current.scene.three.add(ifcModel);
+      // Open IFC model
+      const modelID = ifcApi.OpenModel(data);
+
+      // Remove previous model meshes
+      const toRemove = scene.children.filter((c: any) => c.name === 'ifc_model');
+      toRemove.forEach((m: any) => scene.remove(m));
+
+      // Extract all geometry from the IFC model
+      const modelGroup = new THREE.Group();
+      modelGroup.name = 'ifc_model';
+
+      // Get all mesh geometries
+      ifcApi.StreamAllMeshes(modelID, (mesh: any) => {
+        const placedGeometries = mesh.geometries;
+        for (let i = 0; i < placedGeometries.size(); i++) {
+          const placedGeometry = placedGeometries.get(i);
+          const ifcGeometry = ifcApi.GetGeometry(modelID, placedGeometry.geometryExpressID);
+
+          const verts = ifcApi.GetVertexArray(
+            ifcGeometry.GetVertexData(),
+            ifcGeometry.GetVertexDataSize()
+          );
+          const indices = ifcApi.GetIndexArray(
+            ifcGeometry.GetIndexData(),
+            ifcGeometry.GetIndexDataSize()
+          );
+
+          if (verts.length === 0 || indices.length === 0) {
+            ifcGeometry.delete();
+            continue;
+          }
+
+          // Build Three.js geometry from raw vertex/index data
+          const geometry = new THREE.BufferGeometry();
+
+          // web-ifc vertex data: [x, y, z, nx, ny, nz] per vertex
+          const posArray = new Float32Array(verts.length / 2);
+          const norArray = new Float32Array(verts.length / 2);
+          for (let v = 0; v < verts.length; v += 6) {
+            const idx = v / 2;
+            posArray[idx] = verts[v];
+            posArray[idx + 1] = verts[v + 1];
+            posArray[idx + 2] = verts[v + 2];
+            norArray[idx] = verts[v + 3];
+            norArray[idx + 1] = verts[v + 4];
+            norArray[idx + 2] = verts[v + 5];
+          }
+
+          geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+          geometry.setAttribute('normal', new THREE.BufferAttribute(norArray, 3));
+          geometry.setIndex(Array.from(indices));
+
+          // Apply IFC color
+          const color = placedGeometry.color;
+          const material = new THREE.MeshPhongMaterial({
+            color: new THREE.Color(color.x, color.y, color.z),
+            opacity: color.w,
+            transparent: color.w < 1.0,
+            side: THREE.DoubleSide,
+            depthWrite: color.w >= 1.0,
+          });
+
+          const mesh3D = new THREE.Mesh(geometry, material);
+
+          // Apply transformation matrix
+          const matrix = new THREE.Matrix4();
+          const flatMatrix = placedGeometry.flatTransformation;
+          matrix.fromArray(flatMatrix);
+          mesh3D.applyMatrix4(matrix);
+
+          mesh3D.name = `ifc_element_${mesh.expressID}`;
+          mesh3D.userData.expressID = mesh.expressID;
+          modelGroup.add(mesh3D);
+
+          ifcGeometry.delete();
+        }
+      });
+
+      scene.add(modelGroup);
+
+      // Fit camera to model
+      const box = new THREE.Box3().setFromObject(modelGroup);
+      if (!box.isEmpty()) {
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const dist = maxDim * 1.5;
+
+        camera.position.set(center.x + dist, center.y + dist * 0.7, center.z + dist);
+        controls.target.copy(center);
+        controls.update();
+      }
+
+      // Cleanup web-ifc model (keep API for future queries)
+      fragmentsRef.current = { ifcApi, modelID };
 
       setSelectedModel(model);
 
@@ -265,32 +375,140 @@ export default function ViewerPage() {
     }
   }, [defectsData, updateDefectPins]);
 
-  // ── Handle click on 3D canvas (for mapping) ──────────────────────
-  const handleCanvasClick = useCallback(async (e: React.MouseEvent) => {
-    if (!mappingDefectId || !componentsRef.current || !worldRef.current) return;
+  // ── Raycast helper (shared by hover + click) ─────────────────────
+  const raycastIFC = useCallback((e: React.MouseEvent) => {
+    if (!componentsRef.current) return null;
+    const { raycaster, mouse, scene, camera } = componentsRef.current;
+    const canvas = componentsRef.current.renderer?.domElement;
+    if (!canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const ifcModel = scene.children.find((c: any) => c.name === 'ifc_model');
+    if (!ifcModel) return null;
+
+    const intersects = raycaster.intersectObjects(ifcModel.children, true);
+    return intersects.length > 0 ? intersects[0] : null;
+  }, []);
+
+  // ── Get IFC element properties from web-ifc ──────────────────────
+  const getElementProperties = useCallback((expressID: number): Record<string, string> => {
+    if (!fragmentsRef.current?.ifcApi || fragmentsRef.current.modelID === undefined) return {};
+    const { ifcApi, modelID } = fragmentsRef.current;
+    const props: Record<string, string> = { 'Express ID': String(expressID) };
 
     try {
-      const OBC = await import('@thatopen/components');
-      const raycasters = componentsRef.current.get(OBC.Raycasters);
-      const raycaster = raycasters.get(worldRef.current);
-      const result = raycaster.castRay();
+      const line = ifcApi.GetLine(modelID, expressID);
+      if (line) {
+        if (line.GlobalId?.value) props['Global ID'] = line.GlobalId.value;
+        if (line.Name?.value) props['Name'] = line.Name.value;
+        if (line.Description?.value) props['Description'] = line.Description.value;
+        if (line.ObjectType?.value) props['Object Type'] = line.ObjectType.value;
+        if (line.Tag?.value) props['Tag'] = line.Tag.value;
+        // Get the IFC type name
+        const type = ifcApi.GetLineType(modelID, expressID);
+        if (type) props['IFC Type'] = String(type);
+      }
+    } catch {
+      // Some elements may not have property sets
+    }
 
-      if (result && result.object) {
-        const point = result.point;
-        const worldPosition = { x: point.x, y: point.y, z: point.z };
+    return props;
+  }, []);
 
-        // Try to get IFC element GUID from the intersected object
-        let elementGuid = `element_${Date.now()}`;
-        const fragments = componentsRef.current.get(OBC.FragmentsManager);
-        if (result.object.uuid && fragments) {
-          elementGuid = result.object.uuid;
+  // ── Hover highlight ──────────────────────────────────────────────
+  const prevHighlightRef = useRef<{ mesh: any; originalMaterial: any } | null>(null);
+
+  const handleCanvasHover = useCallback((e: React.MouseEvent) => {
+    if (!componentsRef.current) return;
+    const { THREE } = componentsRef.current;
+
+    // Restore previous highlight
+    if (prevHighlightRef.current) {
+      prevHighlightRef.current.mesh.material = prevHighlightRef.current.originalMaterial;
+      prevHighlightRef.current = null;
+    }
+
+    const hit = raycastIFC(e);
+    if (hit && hit.object) {
+      const mesh = hit.object;
+      const originalMaterial = mesh.material;
+
+      // Create highlight material (keep original color but add emissive glow)
+      const highlightMat = originalMaterial.clone();
+      highlightMat.emissive = new THREE.Color(0x4488ff);
+      highlightMat.emissiveIntensity = 0.3;
+      mesh.material = highlightMat;
+
+      prevHighlightRef.current = { mesh, originalMaterial };
+
+      // Change cursor
+      componentsRef.current.renderer.domElement.style.cursor = 'pointer';
+    } else {
+      if (componentsRef.current.renderer?.domElement) {
+        componentsRef.current.renderer.domElement.style.cursor = mappingDefectId ? 'crosshair' : 'grab';
+      }
+    }
+  }, [raycastIFC, mappingDefectId]);
+
+  // ── Handle click on 3D canvas ────────────────────────────────────
+  const [mappingSuccess, setMappingSuccess] = useState('');
+
+  const handleCanvasClick = useCallback(async (e: React.MouseEvent) => {
+    if (!componentsRef.current || !worldRef.current) return;
+
+    const hit = raycastIFC(e);
+    if (!hit || !hit.object) return;
+
+    const point = hit.point;
+    const worldPosition = { x: point.x, y: point.y, z: point.z };
+    const expressID = hit.object.userData?.expressID;
+
+    // Get element GUID from web-ifc properties
+    let elementGuid = expressID ? `ifc_${expressID}` : `element_${Date.now()}`;
+    let elementProps: Record<string, string> = {};
+    
+    if (expressID) {
+      elementProps = getElementProperties(expressID);
+      if (elementProps['Global ID']) {
+        elementGuid = elementProps['Global ID'];
+      }
+    }
+
+    // Update selected element (always, for properties panel)
+    setSelectedElementGuid(elementGuid);
+    setSelectedElementProps(elementProps);
+    setActiveTab('properties');
+
+    // If in mapping mode, also map the defect
+    if (mappingDefectId) {
+      try {
+        const token = localStorage.getItem('access_token');
+        const putRes = await fetch(`${API_BASE}/api/v1/defects/${mappingDefectId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            bim_element_guid: elementGuid,
+            world_position: worldPosition,
+          }),
+        });
+
+        if (!putRes.ok) {
+          const errBody = await putRes.json().catch(() => ({ detail: `HTTP ${putRes.status}` }));
+          throw new Error(errBody.detail || `Failed with status ${putRes.status}`);
         }
 
-        // Update defect with BIM mapping
-        await api.put(`/api/v1/defects/${mappingDefectId}`, {
-          bim_element_guid: elementGuid,
-          world_position: worldPosition,
-        });
+        // Show success
+        const defectName = defectsData?.unmapped.find(d => d.id === mappingDefectId)?.defect_class || 'Defect';
+        setMappingSuccess(`✅ ${formatClass(defectName)} mapped to ${elementProps['Name'] || elementGuid.slice(0, 16)}`);
+        setTimeout(() => setMappingSuccess(''), 4000);
 
         // Refresh defects
         if (projectId) {
@@ -300,12 +518,35 @@ export default function ViewerPage() {
         }
 
         setMappingDefectId(null);
-        setSelectedElementGuid(elementGuid);
+      } catch (err) {
+        console.error('Mapping failed:', err);
+        setError(err instanceof Error ? err.message : 'Failed to map defect. Please try again.');
       }
-    } catch (err) {
-      console.error('Mapping failed:', err);
     }
-  }, [mappingDefectId, projectId, updateDefectPins]);
+
+    // Highlight selected element (persistent blue outline)
+    const { THREE, scene } = componentsRef.current;
+    // Remove old selection outlines
+    const oldOutlines = scene.children.filter((c: any) => c.name === 'selection_outline');
+    oldOutlines.forEach((o: any) => scene.remove(o));
+    // Add selection outline  
+    if (hit.object.geometry) {
+      const outlineMat = new THREE.MeshBasicMaterial({
+        color: 0x4488ff,
+        side: THREE.BackSide,
+        transparent: true,
+        opacity: 0.25,
+      });
+      const outline = new THREE.Mesh(hit.object.geometry.clone(), outlineMat);
+      outline.position.copy(hit.object.position);
+      outline.rotation.copy(hit.object.rotation);
+      outline.scale.copy(hit.object.scale).multiplyScalar(1.03);
+      outline.matrix.copy(hit.object.matrix);
+      outline.matrixAutoUpdate = false;
+      outline.name = 'selection_outline';
+      scene.add(outline);
+    }
+  }, [raycastIFC, mappingDefectId, projectId, defectsData, getElementProperties, updateDefectPins]);
 
   // ── Upload IFC ────────────────────────────────────────────────────
   const handleUploadIFC = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,20 +647,33 @@ export default function ViewerPage() {
       {mappingDefectId && (
         <div className={styles.mappingBanner}>
           <Target size={16} />
-          <span>Click on a building element to map the defect to that location</span>
+          <span>🎯 <strong>Mapping Mode:</strong> Hover over elements to preview, then click to map the defect</span>
           <button onClick={() => setMappingDefectId(null)}><X size={12} /> Cancel</button>
         </div>
       )}
 
+      {/* Success toast */}
+      {mappingSuccess && (
+        <div className="toast toast-success" style={{ position: 'static', margin: '0 16px' }}>{mappingSuccess}</div>
+      )}
+
       {error && (
-        <div className="toast toast-error" style={{ position: 'static', margin: '0 16px' }}>⚠️ {error}</div>
+        <div className="toast toast-error" style={{ position: 'static', margin: '0 16px' }}>⚠️ {error}
+          <button onClick={() => setError('')} style={{ marginLeft: 8, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>✕</button>
+        </div>
       )}
 
       {/* Main layout */}
       <div className={styles.main}>
         {/* 3D Canvas */}
         <div className={styles.canvasWrap}>
-          <div ref={containerRef} className={styles.canvas} onClick={handleCanvasClick} />
+          <div
+            ref={containerRef}
+            className={styles.canvas}
+            onClick={handleCanvasClick}
+            onMouseMove={handleCanvasHover}
+            style={{ cursor: mappingDefectId ? 'crosshair' : 'grab' }}
+          />
           {!selectedModel && !isLoading && (
             <div className={styles.canvasEmpty}>
               <Upload size={48} strokeWidth={1} />
@@ -638,15 +892,40 @@ export default function ViewerPage() {
               <div>
                 {selectedElementGuid ? (
                   <>
-                    <div className={styles.sectionHeader}>Selected Element</div>
-                    <div className={styles.resultItem}>
-                      <span className={styles.resultLabel}>GUID</span>
-                      <span className={styles.resultValue} style={{ fontSize: 11 }}>{selectedElementGuid}</span>
+                    <div className={styles.sectionHeader}>
+                      Selected Element
+                      <button
+                        onClick={() => { setSelectedElementGuid(null); setSelectedElementProps(null); }}
+                        style={{ float: 'right', background: 'none', border: 'none', color: 'hsl(0,0%,50%)', cursor: 'pointer', fontSize: 11 }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {selectedElementProps && Object.entries(selectedElementProps).map(([key, val]) => (
+                      <div key={key} className={styles.resultItem}>
+                        <span className={styles.resultLabel}>{key}</span>
+                        <span className={styles.resultValue} style={{ fontSize: 11, wordBreak: 'break-all' }}>{val}</span>
+                      </div>
+                    ))}
+                    {!selectedElementProps && (
+                      <div className={styles.resultItem}>
+                        <span className={styles.resultLabel}>Element ID</span>
+                        <span className={styles.resultValue} style={{ fontSize: 11 }}>{selectedElementGuid}</span>
+                      </div>
+                    )}
+                    <div style={{ padding: '12px 0', borderTop: '1px solid hsl(0,0%,18%)', marginTop: 8 }}>
+                      <div style={{ fontSize: 11, color: 'hsl(0,0%,50%)', marginBottom: 8 }}>
+                        💡 To map a defect to this element, go to the Defects tab and click &quot;Map&quot; on an unmapped defect.
+                      </div>
                     </div>
                   </>
                 ) : (
                   <div style={{ padding: '24px 0', textAlign: 'center', color: 'hsl(0,0%,44%)', fontSize: 13 }}>
-                    Click on an element in the 3D view to see its properties.
+                    <div style={{ marginBottom: 8 }}>🖱️</div>
+                    Click on any element in the 3D model to inspect its properties.
+                    <div style={{ fontSize: 11, marginTop: 8, color: 'hsl(0,0%,36%)' }}>
+                      Hover over elements to see them highlighted in blue.
+                    </div>
                   </div>
                 )}
               </div>
