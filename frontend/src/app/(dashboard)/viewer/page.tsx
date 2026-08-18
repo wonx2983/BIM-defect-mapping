@@ -133,6 +133,13 @@ export default function ViewerPage() {
 
         // Setup fragments manager for IFC loading
         const fragments = components.get(OBC.FragmentsManager);
+        if (!fragments.initialized) {
+          try {
+            fragments.init('/worker.min.mjs');
+          } catch (e) {
+            console.warn('FragmentsManager init:', e);
+          }
+        }
         fragmentsRef.current = fragments;
 
         // Setup raycaster for element picking
@@ -202,6 +209,15 @@ export default function ViewerPage() {
     try {
       const OBC = await import('@thatopen/components');
       const components = componentsRef.current;
+
+      const fragments = components.get(OBC.FragmentsManager);
+      if (!fragments.initialized) {
+        try {
+          fragments.init('/worker.min.mjs');
+        } catch (e) {
+          console.warn('FragmentsManager init:', e);
+        }
+      }
 
       const ifcLoader = components.get(OBC.IfcLoader);
       ifcLoader.settings.autoSetWasm = false;
