@@ -170,7 +170,13 @@ export default function ViewerPage() {
       const components = componentsRef.current;
 
       const ifcLoader = components.get(OBC.IfcLoader);
-      await ifcLoader.setup();
+      try {
+        await ifcLoader.setup({
+          wasm: { path: '/', absolute: true }
+        });
+      } catch {
+        await ifcLoader.setup();
+      }
 
       // Fetch the IFC file
       const token = localStorage.getItem('access_token');
