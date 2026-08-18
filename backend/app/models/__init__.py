@@ -6,6 +6,7 @@ from app.models.project import Project, ProjectStatus
 from app.models.bim_model import BIMModel, ProcessingStatus
 from app.models.inspection import Inspection, InspectionStatus
 from app.models.defect import Defect, DefectClass, DefectStatus, SeverityLevel
+from app.models.camera import Camera, CameraStatus
 
 __all__ = [
     "Organization",
@@ -21,4 +22,7 @@ __all__ = [
     "DefectClass",
     "DefectStatus",
     "SeverityLevel",
+    "Camera",
+    "CameraStatus",
 ]
+
