@@ -135,7 +135,10 @@ export default function ViewerPage() {
         const fragments = components.get(OBC.FragmentsManager);
         if (!fragments.initialized) {
           try {
-            fragments.init('/worker.min.mjs');
+            const res = await fetch('/worker.mjs');
+            const blob = await res.blob();
+            const workerUrl = URL.createObjectURL(blob);
+            fragments.init(workerUrl);
           } catch (e) {
             console.warn('FragmentsManager init:', e);
           }
@@ -213,7 +216,10 @@ export default function ViewerPage() {
       const fragments = components.get(OBC.FragmentsManager);
       if (!fragments.initialized) {
         try {
-          fragments.init('/worker.min.mjs');
+          const res = await fetch('/worker.mjs');
+          const blob = await res.blob();
+          const workerUrl = URL.createObjectURL(blob);
+          fragments.init(workerUrl);
         } catch (e) {
           console.warn('FragmentsManager init:', e);
         }
