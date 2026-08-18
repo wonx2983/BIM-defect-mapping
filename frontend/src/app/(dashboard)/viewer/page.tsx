@@ -73,6 +73,9 @@ export default function ViewerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 3D tooltip for defect pins
+  const [pinTooltip, setPinTooltip] = useState<{ x: number; y: number; label: string; severity: string } | null>(null);
+
   // Init project list
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => {
@@ -425,7 +428,9 @@ export default function ViewerPage() {
 
   const handleCanvasHover = useCallback((e: React.MouseEvent) => {
     if (!componentsRef.current) return;
-    const { THREE } = componentsRef.current;
+    const { THREE, raycaster, mouse, scene, camera, renderer } = componentsRef.current;
+    const canvas = renderer?.domElement;
+    if (!canvas) return;
 
     // Restore previous highlight
     if (prevHighlightRef.current) {
@@ -433,27 +438,50 @@ export default function ViewerPage() {
       prevHighlightRef.current = null;
     }
 
+    // Check defect pins first
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    const pins = scene.children.filter((c: any) => c.name?.startsWith('defect_pin_'));
+    if (pins.length > 0) {
+      const pinHits = raycaster.intersectObjects(pins, false);
+      if (pinHits.length > 0) {
+        const pinName = pinHits[0].object.name; // defect_pin_{id}
+        const defectId = pinName.replace('defect_pin_', '');
+        const defect = defectsData?.mapped.find(d => d.id === defectId);
+        if (defect) {
+          setPinTooltip({
+            x: e.clientX,
+            y: e.clientY,
+            label: `${formatClass(defect.defect_class)} — ${defect.severity}`,
+            severity: defect.severity,
+          });
+          canvas.style.cursor = 'pointer';
+          return;
+        }
+      }
+    }
+    setPinTooltip(null);
+
+    // Then check IFC elements
     const hit = raycastIFC(e);
     if (hit && hit.object) {
       const mesh = hit.object;
       const originalMaterial = mesh.material;
 
-      // Create highlight material (keep original color but add emissive glow)
       const highlightMat = originalMaterial.clone();
       highlightMat.emissive = new THREE.Color(0x4488ff);
       highlightMat.emissiveIntensity = 0.3;
       mesh.material = highlightMat;
 
       prevHighlightRef.current = { mesh, originalMaterial };
-
-      // Change cursor
-      componentsRef.current.renderer.domElement.style.cursor = 'pointer';
+      canvas.style.cursor = 'pointer';
     } else {
-      if (componentsRef.current.renderer?.domElement) {
-        componentsRef.current.renderer.domElement.style.cursor = mappingDefectId ? 'crosshair' : 'grab';
-      }
+      canvas.style.cursor = mappingDefectId ? 'crosshair' : 'grab';
     }
-  }, [raycastIFC, mappingDefectId]);
+  }, [raycastIFC, mappingDefectId, defectsData]);
 
   // ── Handle click on 3D canvas ────────────────────────────────────
   const [mappingSuccess, setMappingSuccess] = useState('');
@@ -675,6 +703,34 @@ export default function ViewerPage() {
             onMouseMove={handleCanvasHover}
             style={{ cursor: mappingDefectId ? 'crosshair' : 'grab' }}
           />
+          {/* Defect pin tooltip */}
+          {pinTooltip && (
+            <div style={{
+              position: 'fixed',
+              left: pinTooltip.x + 12,
+              top: pinTooltip.y - 36,
+              background: 'hsl(0,0%,12%)',
+              border: `1px solid ${SEVERITY_COLORS[pinTooltip.severity] || '#666'}`,
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontSize: 12,
+              color: '#fff',
+              pointerEvents: 'none',
+              zIndex: 1000,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: SEVERITY_COLORS[pinTooltip.severity] || '#cd3333',
+                display: 'inline-block',
+              }} />
+              {pinTooltip.label}
+            </div>
+          )}
           {!selectedModel && !isLoading && (
             <div className={styles.canvasEmpty}>
               <Upload size={48} strokeWidth={1} />
