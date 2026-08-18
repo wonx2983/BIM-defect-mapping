@@ -160,29 +160,69 @@ export default function ViewerPage() {
     };
   }, []);
 
+  // ── Render 3D Pins for Mapped Defects ───────────────────────────
+  const updateDefectPins = useCallback(async (defects: Array<{ id: string; severity: string; world_position: { x: number; y: number; z: number } | null }>) => {
+    if (!worldRef.current) return;
+    try {
+      const THREE = await import('three');
+      const scene = worldRef.current.scene.three;
+
+      // Remove existing pins
+      const existingPins = scene.children.filter((c: any) => c.name?.startsWith('defect_pin_'));
+      existingPins.forEach((p: any) => scene.remove(p));
+
+      // Add new pins
+      defects.forEach((d) => {
+        if (!d.world_position) return;
+        const { x, y, z } = d.world_position;
+        const geometry = new THREE.SphereGeometry(0.35, 16, 16);
+        const color = SEVERITY_COLORS[d.severity] || '#cd3333';
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(color),
+          emissive: new THREE.Color(color),
+          emissiveIntensity: 0.4,
+          roughness: 0.2,
+        });
+        const pin = new THREE.Mesh(geometry, material);
+        pin.position.set(x, y, z);
+        pin.name = `defect_pin_${d.id}`;
+        scene.add(pin);
+      });
+    } catch (err) {
+      console.error('Failed to render 3D defect pins:', err);
+    }
+  }, []);
+
   // ── Load IFC Model ────────────────────────────────────────────────
   const loadIFCModel = useCallback(async (model: BIMModel) => {
     if (!componentsRef.current || !worldRef.current) return;
 
     setIsLoading(true);
+    setError('');
     try {
       const OBC = await import('@thatopen/components');
       const components = componentsRef.current;
 
       const ifcLoader = components.get(OBC.IfcLoader);
-      try {
-        await ifcLoader.setup({
-          wasm: { path: '/', absolute: true }
-        });
-      } catch {
-        await ifcLoader.setup();
+      ifcLoader.settings.autoSetWasm = false;
+      ifcLoader.settings.wasm = {
+        path: '/',
+        absolute: true,
+      };
+      ifcLoader.settings.customLocateFileHandler = (path: string) => `/${path}`;
+      if (ifcLoader.settings.webIfc) {
+        ifcLoader.settings.webIfc.locateFile = (path: string) => `/${path}`;
       }
+      await ifcLoader.setup();
 
       // Fetch the IFC file
       const token = localStorage.getItem('access_token');
       const response = await fetch(`${API_BASE}${model.file_url}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!response.ok) {
+        throw new Error(`Failed to download model file: HTTP ${response.status}`);
+      }
       const buffer = await response.arrayBuffer();
       const data = new Uint8Array(buffer);
 
@@ -190,13 +230,18 @@ export default function ViewerPage() {
       worldRef.current.scene.three.add(ifcModel);
 
       setSelectedModel(model);
+
+      // Render any existing mapped defect pins
+      if (defectsData?.mapped) {
+        updateDefectPins(defectsData.mapped);
+      }
     } catch (err) {
       console.error('Failed to load IFC model:', err);
-      setError('Failed to load IFC model. The file may be corrupted.');
+      setError(err instanceof Error ? err.message : 'Failed to load IFC model.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [defectsData, updateDefectPins]);
 
   // ── Handle click on 3D canvas (for mapping) ──────────────────────
   const handleCanvasClick = useCallback(async (e: React.MouseEvent) => {
@@ -229,6 +274,7 @@ export default function ViewerPage() {
         if (projectId) {
           const defects = await getMappedDefects(projectId);
           setDefectsData(defects);
+          updateDefectPins(defects.mapped);
         }
 
         setMappingDefectId(null);
@@ -237,7 +283,7 @@ export default function ViewerPage() {
     } catch (err) {
       console.error('Mapping failed:', err);
     }
-  }, [mappingDefectId, projectId]);
+  }, [mappingDefectId, projectId, updateDefectPins]);
 
   // ── Upload IFC ────────────────────────────────────────────────────
   const handleUploadIFC = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,6 +340,7 @@ export default function ViewerPage() {
       if (projectId) {
         const defects = await getMappedDefects(projectId);
         setDefectsData(defects);
+        updateDefectPins(defects.mapped);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Detection failed');
