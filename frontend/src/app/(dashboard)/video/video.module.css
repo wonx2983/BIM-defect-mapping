@@ -1,0 +1,133 @@
+.container { display: flex; flex-direction: column; gap: 20px; }
+
+.tabBar {
+  display: flex; gap: 4px; padding: 4px;
+  background: hsl(0, 0%, 8%); border-radius: 10px;
+  border: 1px solid hsl(0, 0%, 14%);
+}
+.tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
+  background: transparent; color: hsl(0, 0%, 50%);
+  font-size: 13px; font-weight: 500; transition: all 0.15s;
+}
+.tab:hover { color: hsl(0, 0%, 80%); background: hsl(0, 0%, 12%); }
+.tabActive { color: hsl(0, 0%, 93%); background: hsl(0, 0%, 15%); }
+
+.projectBar {
+  display: flex; align-items: center; gap: 12px; font-size: 13px;
+  color: hsl(0, 0%, 60%);
+}
+.projectBar select { font-size: 13px; }
+
+.content { display: flex; flex-direction: column; gap: 16px; }
+
+/* Drop Zone */
+.dropZone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 48px 24px; border: 2px dashed hsl(0, 0%, 18%);
+  border-radius: 12px; cursor: pointer; transition: all 0.2s;
+  color: hsl(0, 0%, 44%); min-height: 200px;
+}
+.dropZone:hover { border-color: hsl(0, 0%, 30%); background: hsl(0, 0%, 8%); }
+.dropZoneHasFile { border-color: hsl(0, 0%, 25%); background: hsl(0, 0%, 7%); }
+.dropText { font-size: 14px; font-weight: 500; color: hsl(0, 0%, 60%); }
+.dropHint { font-size: 12px; color: hsl(0, 0%, 40%); }
+.fileInfo { display: flex; flex-direction: column; align-items: center; gap: 8px; color: hsl(0, 0%, 80%); }
+.fileName { font-size: 14px; font-weight: 600; }
+.fileMeta { font-size: 12px; color: hsl(0, 0%, 50%); }
+
+/* Controls */
+.controls { display: flex; gap: 16px; align-items: flex-end; }
+.progressBar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px; background: hsl(0, 0%, 8%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 8px;
+  font-size: 13px; color: hsl(0, 0%, 60%);
+}
+
+/* Preview */
+.previewSection { border-radius: 12px; overflow: hidden; }
+.videoPreview { width: 100%; max-height: 400px; border-radius: 12px; background: #000; }
+
+/* RTSP */
+.rtspForm { display: flex; gap: 12px; flex-wrap: wrap; }
+.rtspGuide {
+  padding: 16px 20px; background: hsl(0, 0%, 7%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 10px;
+  font-size: 13px; color: hsl(0, 0%, 55%); line-height: 1.7;
+}
+.rtspGuide h4 { margin: 0 0 8px 0; color: hsl(0, 0%, 75%); font-size: 13px; }
+.rtspGuide ol { margin: 0; padding-left: 18px; }
+.rtspGuide ul { margin: 4px 0; padding-left: 18px; }
+.rtspGuide code {
+  padding: 1px 6px; background: hsl(0, 0%, 12%);
+  border-radius: 4px; font-size: 12px; color: hsl(0, 0%, 70%);
+}
+
+/* Webcam */
+.webcamSection { display: flex; flex-direction: column; gap: 16px; }
+.webcamContainer {
+  position: relative; width: 100%; max-width: 640px;
+  aspect-ratio: 4 / 3; background: #000; border-radius: 12px; overflow: hidden;
+  border: 1px solid hsl(0, 0%, 14%);
+}
+.webcamVideo { width: 100%; height: 100%; object-fit: cover; }
+.webcamOverlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  color: hsl(0, 0%, 44%); font-size: 13px;
+}
+.webcamControls { display: flex; gap: 12px; }
+.webcamDetections {
+  padding: 12px 16px; background: hsl(0, 0%, 7%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 10px; max-width: 640px;
+}
+.webcamDetections h4 { margin: 0 0 8px 0; font-size: 13px; color: hsl(0, 0%, 70%); }
+.liveDetection {
+  display: flex; align-items: center; gap: 12px;
+  padding: 6px 0; font-size: 13px;
+}
+.liveClass { color: hsl(0, 0%, 85%); font-weight: 500; flex: 1; }
+.liveSeverity { font-weight: 600; text-transform: uppercase; font-size: 11px; }
+.liveConf { color: hsl(0, 0%, 50%); font-size: 12px; }
+
+/* Results Panel */
+.resultsPanel {
+  padding: 24px; background: hsl(0, 0%, 7%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 12px;
+}
+.resultsTitle { margin: 0 0 16px 0; font-size: 16px; color: hsl(0, 0%, 90%); font-weight: 600; }
+
+.statsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.statCard {
+  padding: 16px; background: hsl(0, 0%, 10%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 10px; text-align: center;
+}
+.statValue { font-size: 24px; font-weight: 700; color: hsl(0, 0%, 93%); }
+.statLabel { font-size: 11px; color: hsl(0, 0%, 50%); margin-top: 4px; }
+
+.breakdownRow { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.breakdownCard {
+  padding: 16px; background: hsl(0, 0%, 10%);
+  border: 1px solid hsl(0, 0%, 14%); border-radius: 10px;
+}
+.breakdownCard h4 { margin: 0 0 12px 0; font-size: 13px; color: hsl(0, 0%, 70%); }
+.breakdownItem { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.breakdownDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.breakdownLabel { flex: 1; color: hsl(0, 0%, 75%); text-transform: capitalize; }
+.breakdownCount { font-weight: 600; color: hsl(0, 0%, 90%); }
+
+.savedInfo {
+  padding: 12px 16px; background: hsla(152, 30%, 45%, 0.1);
+  border: 1px solid hsla(152, 30%, 45%, 0.2); border-radius: 8px;
+  font-size: 13px; color: hsl(152, 30%, 65%); margin-top: 12px;
+}
+
+@media (max-width: 768px) {
+  .tabBar { flex-direction: column; }
+  .statsGrid { grid-template-columns: repeat(2, 1fr); }
+  .breakdownRow { grid-template-columns: 1fr; }
+  .controls { flex-direction: column; }
+  .rtspForm { flex-direction: column; }
+}
