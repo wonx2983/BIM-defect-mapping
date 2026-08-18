@@ -488,7 +488,8 @@ export default function ViewerPage() {
     if (mappingDefectId) {
       try {
         const token = localStorage.getItem('access_token');
-        const putRes = await fetch(`${API_BASE}/api/v1/defects/${mappingDefectId}`, {
+        // Use same-origin proxy to avoid CORS issues with PUT
+        const putRes = await fetch(`/api/proxy/defects/${mappingDefectId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -721,18 +722,69 @@ export default function ViewerPage() {
                 {/* Mapped defects */}
                 {defectsData && defectsData.mapped.length > 0 && (
                   <>
-                    <div className={styles.sectionHeader}>Mapped to BIM ({defectsData.mapped_count})</div>
+                    <div className={styles.sectionHeader}>✅ Mapped to BIM ({defectsData.mapped_count})</div>
                     {defectsData.mapped.map((d) => (
                       <div key={d.id} className={styles.defectItem}>
                         <div className={styles.defectDot} style={{ background: SEVERITY_COLORS[d.severity] }} />
                         <div className={styles.defectInfo}>
                           <div className={styles.defectClass}>{formatClass(d.defect_class)}</div>
                           <div className={styles.defectMeta}>
-                            {d.severity} • {(d.confidence * 100).toFixed(0)}% • {d.bim_element_guid?.slice(0, 12)}...
+                            {d.severity} • {(d.confidence * 100).toFixed(0)}% • {d.bim_element_guid?.slice(0, 16)}
                           </div>
                         </div>
                         <div className={styles.defectActions}>
-                          <button className={styles.mapBtn} title="View on model"><Eye size={12} /></button>
+                          <button
+                            className={styles.mapBtn}
+                            title="Fly to location on model"
+                            onClick={() => {
+                              if (d.world_position && componentsRef.current) {
+                                const { camera, controls } = componentsRef.current;
+                                const { x, y, z } = d.world_position;
+                                camera.position.set(x + 8, y + 6, z + 8);
+                                controls.target.set(x, y, z);
+                                controls.update();
+                              }
+                            }}
+                          >
+                            <Eye size={12} />
+                          </button>
+                          <button
+                            className={`${styles.mapBtn} ${mappingDefectId === d.id ? styles.mapBtnActive : ''}`}
+                            title="Re-map to different element"
+                            onClick={() => setMappingDefectId(mappingDefectId === d.id ? null : d.id)}
+                          >
+                            <MapPin size={12} />
+                          </button>
+                          <button
+                            className={styles.mapBtn}
+                            title="Remove BIM mapping"
+                            style={{ color: '#cd3333' }}
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem('access_token');
+                                const res = await fetch(`/api/proxy/defects/${d.id}`, {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                  },
+                                  body: JSON.stringify({ bim_element_guid: null, world_position: null }),
+                                });
+                                if (!res.ok) throw new Error('Failed to unmap');
+                                if (projectId) {
+                                  const defects = await getMappedDefects(projectId);
+                                  setDefectsData(defects);
+                                  updateDefectPins(defects.mapped);
+                                }
+                                setMappingSuccess('🔄 Defect unmapped from BIM element');
+                                setTimeout(() => setMappingSuccess(''), 3000);
+                              } catch (err) {
+                                setError('Failed to unmap defect');
+                              }
+                            }}
+                          >
+                            <X size={12} />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -742,7 +794,7 @@ export default function ViewerPage() {
                 {/* Unmapped defects */}
                 {defectsData && defectsData.unmapped.length > 0 && (
                   <>
-                    <div className={styles.sectionHeader}>Unmapped ({defectsData.unmapped_count})</div>
+                    <div className={styles.sectionHeader}>📌 Unmapped ({defectsData.unmapped_count})</div>
                     {defectsData.unmapped.map((d) => (
                       <div key={d.id} className={styles.defectItem}>
                         <div className={styles.defectDot} style={{ background: SEVERITY_COLORS[d.severity] }} />
@@ -754,8 +806,9 @@ export default function ViewerPage() {
                           <button
                             className={`${styles.mapBtn} ${mappingDefectId === d.id ? styles.mapBtnActive : ''}`}
                             onClick={() => setMappingDefectId(mappingDefectId === d.id ? null : d.id)}
+                            title="Click to enter mapping mode, then click a BIM element"
                           >
-                            <MapPin size={12} /> Map
+                            <MapPin size={12} /> {mappingDefectId === d.id ? 'Cancel' : 'Map'}
                           </button>
                         </div>
                       </div>

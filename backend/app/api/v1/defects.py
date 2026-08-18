@@ -194,6 +194,7 @@ async def update_defect(
         setattr(defect, field, value)
 
     await db.flush()
+    await db.refresh(defect)
     return DefectResponse.model_validate(defect)
 
 
