@@ -550,14 +550,32 @@ export default function VideoDetectionPage() {
 
           {/* Download annotated video */}
           {result.download_url && (
-            <a
-              href={`${API_BASE}${result.download_url}?authorization=Bearer+${localStorage.getItem('access_token')}`}
+            <button
               className="btn btn-primary"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12 }}
-              download
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem('access_token');
+                  const res = await fetch(`${API_BASE}${result.download_url}`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                  });
+                  if (!res.ok) throw new Error('Download failed');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `defectsync_annotated_${result.result_id}.mp4`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  alert('Failed to download video. Please try again.');
+                }
+              }}
             >
               <Download size={16} /> Download Annotated Video
-            </a>
+            </button>
           )}
         </div>
       )}
