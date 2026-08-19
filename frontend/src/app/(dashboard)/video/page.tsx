@@ -556,7 +556,7 @@ export default function VideoDetectionPage() {
               onClick={async () => {
                 try {
                   const token = localStorage.getItem('access_token');
-                  const res = await fetch(`${API_BASE}${result.download_url}`, {
+                  const res = await fetch(`/api/proxy/video/download/${result.result_id}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {},
                   });
                   if (!res.ok) throw new Error('Download failed');
