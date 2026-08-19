@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
-import { Upload, Video, Wifi, Camera, Play, Square, Download, AlertTriangle, Loader } from 'lucide-react';
+import { Upload, Video, Wifi, Camera, Play, Square, Download, AlertTriangle, Loader, Film, ChevronRight, ChevronDown, CheckCircle2, X } from 'lucide-react';
 import styles from './video.module.css';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -547,8 +547,9 @@ export default function VideoDetectionPage() {
 
           {/* Saved defects info */}
           {result.saved_defect_count > 0 && (
-            <div className={styles.savedInfo}>
-              ✅ {result.saved_defect_count} unique defect{result.saved_defect_count !== 1 ? 's' : ''} saved to project
+            <div className={styles.savedInfo} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircle2 size={15} color="#2d8a5e" />
+              <span>{result.saved_defect_count} unique defect{result.saved_defect_count !== 1 ? 's' : ''} saved to project</span>
             </div>
           )}
 
@@ -561,13 +562,14 @@ export default function VideoDetectionPage() {
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                   background: 'hsl(0,0%,12%)', border: '1px solid hsl(0,0%,20%)',
                   borderRadius: 6, padding: '8px 12px', cursor: 'pointer',
-                  color: 'hsl(0,0%,85%)', fontSize: 13, fontWeight: 600,
+                  color: 'hsl(0,0%,85%)', fontSize: 13, fontWeight: 500,
                 }}
               >
-                <span style={{ transform: previewExpanded ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s', fontSize: 12 }}>▶</span>
-                📸 Detected Frames ({result.frame_detections.filter(fd => fd.snapshot_url).length})
+                {previewExpanded ? <ChevronDown size={15} color="hsl(0,0%,70%)" /> : <ChevronRight size={15} color="hsl(0,0%,70%)" />}
+                <Film size={14} color="hsl(215,70%,60%)" />
+                <span>Detected Frames ({result.frame_detections.filter(fd => fd.snapshot_url).length})</span>
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'hsl(0,0%,50%)', fontWeight: 400 }}>
-                  {previewExpanded ? 'Click to collapse' : 'Click to expand'}
+                  {previewExpanded ? 'Collapse' : 'Expand'}
                 </span>
               </button>
               {previewExpanded && (
@@ -673,12 +675,12 @@ export default function VideoDetectionPage() {
               position: 'absolute', top: 20, right: 24,
               background: 'hsl(0,0%,15%)', border: '1px solid hsl(0,0%,30%)',
               borderRadius: '50%', width: 40, height: 40,
-              color: '#fff', fontSize: 20, cursor: 'pointer',
+              color: '#fff', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
             title="Close (Esc)"
           >
-            ✕
+            <X size={18} />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
