@@ -50,6 +50,8 @@ export default function VideoDetectionPage() {
   const [activeTab, setActiveTab] = useState<TabId>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [result, setResult] = useState<VideoResult | null>(null);
   const [progress, setProgress] = useState('');
 
@@ -258,6 +260,7 @@ export default function VideoDetectionPage() {
   ];
 
   return (
+    <>
     <div className={styles.container}>
       {/* Tab Bar */}
       <div className={styles.tabBar}>
@@ -549,68 +552,74 @@ export default function VideoDetectionPage() {
             </div>
           )}
 
-          {/* Frame Preview Gallery */}
+          {/* Frame Preview Gallery — Collapsible */}
           {result.frame_detections.filter(fd => fd.snapshot_url).length > 0 && (
             <div style={{ marginTop: 16 }}>
-              <h4 style={{ fontSize: 13, fontWeight: 600, color: 'hsl(0,0%,85%)', marginBottom: 10 }}>
+              <button
+                onClick={() => setPreviewExpanded(!previewExpanded)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  background: 'hsl(0,0%,12%)', border: '1px solid hsl(0,0%,20%)',
+                  borderRadius: 6, padding: '8px 12px', cursor: 'pointer',
+                  color: 'hsl(0,0%,85%)', fontSize: 13, fontWeight: 600,
+                }}
+              >
+                <span style={{ transform: previewExpanded ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform 0.2s', fontSize: 12 }}>▶</span>
                 📸 Detected Frames ({result.frame_detections.filter(fd => fd.snapshot_url).length})
-              </h4>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: 10,
-              }}>
-                {result.frame_detections
-                  .filter(fd => fd.snapshot_url)
-                  .map((fd) => (
-                    <div
-                      key={fd.frame_index}
-                      style={{
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        background: 'hsl(0,0%,10%)',
-                        border: '1px solid hsl(0,0%,18%)',
-                        cursor: 'pointer',
-                        transition: 'border-color 0.15s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'hsl(215,60%,50%)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'hsl(0,0%,18%)')}
-                      onClick={() => {
-                        // Open full-size snapshot in a new tab
-                        window.open(`${API_BASE}${fd.snapshot_url}`, '_blank');
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`${API_BASE}${fd.snapshot_url}`}
-                        alt={`Frame ${fd.frame_index}`}
-                        style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }}
-                      />
-                      <div style={{ padding: '6px 8px' }}>
-                        <div style={{ fontSize: 11, color: 'hsl(0,0%,60%)', marginBottom: 3 }}>
-                          Frame {fd.frame_index} • {(fd.timestamp_ms / 1000).toFixed(1)}s
-                        </div>
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {fd.detections.map((det, i) => (
-                            <span
-                              key={i}
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 5px',
-                                borderRadius: 3,
-                                background: SEVERITY_COLORS[det.severity] + '22',
-                                color: SEVERITY_COLORS[det.severity],
-                                border: `1px solid ${SEVERITY_COLORS[det.severity]}44`,
-                              }}
-                            >
-                              {formatClass(det.defect_class)}
-                            </span>
-                          ))}
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'hsl(0,0%,50%)', fontWeight: 400 }}>
+                  {previewExpanded ? 'Click to collapse' : 'Click to expand'}
+                </span>
+              </button>
+              {previewExpanded && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                  gap: 10, marginTop: 10,
+                }}>
+                  {result.frame_detections
+                    .filter(fd => fd.snapshot_url)
+                    .map((fd) => (
+                      <div
+                        key={fd.frame_index}
+                        style={{
+                          borderRadius: 8, overflow: 'hidden',
+                          background: 'hsl(0,0%,10%)', border: '1px solid hsl(0,0%,18%)',
+                          cursor: 'pointer', transition: 'border-color 0.15s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = 'hsl(215,60%,50%)')}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = 'hsl(0,0%,18%)')}
+                        onClick={() => setLightboxSrc(`${API_BASE}${fd.snapshot_url}`)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`${API_BASE}${fd.snapshot_url}`}
+                          alt={`Frame ${fd.frame_index}`}
+                          style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }}
+                        />
+                        <div style={{ padding: '6px 8px' }}>
+                          <div style={{ fontSize: 11, color: 'hsl(0,0%,60%)', marginBottom: 3 }}>
+                            Frame {fd.frame_index} • {(fd.timestamp_ms / 1000).toFixed(1)}s
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {fd.detections.map((det, i) => (
+                              <span
+                                key={i}
+                                style={{
+                                  fontSize: 10, padding: '1px 5px', borderRadius: 3,
+                                  background: SEVERITY_COLORS[det.severity] + '22',
+                                  color: SEVERITY_COLORS[det.severity],
+                                  border: `1px solid ${SEVERITY_COLORS[det.severity]}44`,
+                                }}
+                              >
+                                {formatClass(det.defect_class)}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-              </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -646,5 +655,44 @@ export default function VideoDetectionPage() {
         </div>
       )}
     </div>
+
+      {/* Lightbox Modal */}
+      {lightboxSrc && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setLightboxSrc(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setLightboxSrc(null); }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightboxSrc(null); }}
+            style={{
+              position: 'absolute', top: 20, right: 24,
+              background: 'hsl(0,0%,15%)', border: '1px solid hsl(0,0%,30%)',
+              borderRadius: '50%', width: 40, height: 40,
+              color: '#fff', fontSize: 20, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="Close (Esc)"
+          >
+            ✕
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxSrc}
+            alt="Frame preview"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw', maxHeight: '85vh',
+              borderRadius: 8, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              objectFit: 'contain',
+            }}
+          />
+        </div>
+      )}
+    </>
   );
 }
