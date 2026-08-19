@@ -26,6 +26,7 @@ interface VideoResult {
     frame_index: number;
     timestamp_ms: number;
     detection_count: number;
+    snapshot_url?: string;
     detections: Array<{
       defect_class: string;
       confidence: number;
@@ -545,6 +546,71 @@ export default function VideoDetectionPage() {
           {result.saved_defect_count > 0 && (
             <div className={styles.savedInfo}>
               ✅ {result.saved_defect_count} unique defect{result.saved_defect_count !== 1 ? 's' : ''} saved to project
+            </div>
+          )}
+
+          {/* Frame Preview Gallery */}
+          {result.frame_detections.filter(fd => fd.snapshot_url).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <h4 style={{ fontSize: 13, fontWeight: 600, color: 'hsl(0,0%,85%)', marginBottom: 10 }}>
+                📸 Detected Frames ({result.frame_detections.filter(fd => fd.snapshot_url).length})
+              </h4>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: 10,
+              }}>
+                {result.frame_detections
+                  .filter(fd => fd.snapshot_url)
+                  .map((fd) => (
+                    <div
+                      key={fd.frame_index}
+                      style={{
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        background: 'hsl(0,0%,10%)',
+                        border: '1px solid hsl(0,0%,18%)',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'hsl(215,60%,50%)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'hsl(0,0%,18%)')}
+                      onClick={() => {
+                        // Open full-size snapshot in a new tab
+                        window.open(`${API_BASE}${fd.snapshot_url}`, '_blank');
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`${API_BASE}${fd.snapshot_url}`}
+                        alt={`Frame ${fd.frame_index}`}
+                        style={{ width: '100%', height: 130, objectFit: 'cover', display: 'block' }}
+                      />
+                      <div style={{ padding: '6px 8px' }}>
+                        <div style={{ fontSize: 11, color: 'hsl(0,0%,60%)', marginBottom: 3 }}>
+                          Frame {fd.frame_index} • {(fd.timestamp_ms / 1000).toFixed(1)}s
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {fd.detections.map((det, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 5px',
+                                borderRadius: 3,
+                                background: SEVERITY_COLORS[det.severity] + '22',
+                                color: SEVERITY_COLORS[det.severity],
+                                border: `1px solid ${SEVERITY_COLORS[det.severity]}44`,
+                              }}
+                            >
+                              {formatClass(det.defect_class)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
 

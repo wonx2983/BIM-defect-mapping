@@ -64,6 +64,7 @@ class VideoProcessingResult:
                     "frame_index": fd.frame_index,
                     "timestamp_ms": round(fd.timestamp_ms, 1),
                     "detection_count": len(fd.detections),
+                    "snapshot_url": getattr(fd, 'snapshot_url', None),
                     "detections": [
                         {
                             "defect_class": d.defect_class,
@@ -212,6 +213,18 @@ def process_video_file(
                 detections=inference_result.detections,
                 inference_time_ms=inference_ms,
             )
+
+            # Save annotated snapshot for frames with detections
+            if len(inference_result.detections) > 0 and output_dir:
+                snapshot_dir = Path(output_dir) / "snapshots"
+                snapshot_dir.mkdir(parents=True, exist_ok=True)
+                annotated_snap = _draw_boxes_on_frame(frame, inference_result.detections)
+                snap_filename = f"frame_{frame_index}_{uuid.uuid4().hex[:6]}.jpg"
+                snap_path = snapshot_dir / snap_filename
+                cv2.imwrite(str(snap_path), annotated_snap, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                # Store relative URL for serving via StaticFiles
+                frame_det.snapshot_url = f"/uploads/videos/annotated/snapshots/{snap_filename}"
+
             result.frame_detections.append(frame_det)
             result.processed_frames += 1
             all_detections_count += len(inference_result.detections)
