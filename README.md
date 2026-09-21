@@ -87,37 +87,100 @@ A professional-grade, production-ready platform for real-time construction defec
 
 ---
 
-## Getting Started
+## Getting Started After Cloning
 
 ### Prerequisites
-- Python 3.11+ (for local ML training & Backend)
-- Node.js 18+ (for local frontend dev)
-- Accounts on [Neon](https://neon.tech) and [Upstash](https://upstash.com) for database/redis
+- **Git**
+- **Python 3.11+**
+- **Node.js 18+** & **npm**
 
-### Installation
+---
 
-1. Clone the repository
+### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/wonx2983/BIM-defect-mapping.git
 cd BIM-defect-mapping
 ```
 
-2. Setup Backend (FastAPI)
+---
+
+### Step 2: Configure Environment (`.env`)
+Place your `.env` file in the root project directory (`BIM-defect-mapping/.env`):
 ```bash
+# You can copy the template if starting fresh:
+cp .env.example .env
+```
+*(Fill in your database and service credentials in `.env`. Both the backend and ML services read directly from this single root file.)*
+
+> **Note on Model Weights:** The trained defect detection weights (`backend/ml/models/defect_detector.pt`) are already bundled in the repository, so no separate model download is needed.
+
+---
+
+### Step 3: Backend Setup
+
+#### 🪟 Windows (PowerShell)
+```powershell
+# 1. Navigate to backend directory
 cd backend
+
+# 2. Create virtual environment
 python -m venv venv
-venv\Scripts\activate
+
+# 3. Activate virtual environment
+.\venv\Scripts\Activate.ps1
+# (If execution policy restricts scripts: Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass)
+
+# 4. Install dependencies
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+
+# 5. Apply database migrations
+alembic upgrade head
+
+# 6. Start the FastAPI backend server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-3. Setup Frontend (Next.js)
+#### 🍎 macOS / Linux (Terminal / zsh / bash)
 ```bash
+# 1. Navigate to backend directory
+cd backend
+
+# 2. Create virtual environment
+python3 -m venv venv
+
+# 3. Activate virtual environment
+source venv/bin/activate
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. Apply database migrations
+alembic upgrade head
+
+# 6. Start the FastAPI backend server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+---
+
+### Step 4: Frontend Setup (New Terminal Window)
+
+#### 🪟 Windows & 🍎 macOS / Linux
+Open a separate terminal window and run:
+```bash
+# 1. Navigate to frontend directory
 cd frontend
+
+# 2. Install dependencies
 npm install
+
+# 3. Start development server
 npm run dev
 ```
 
-4. Access the application
-- Frontend: `http://localhost:3000`
-- Backend API Docs: `http://localhost:8000/docs`
+---
+
+### Step 5: Access the Application
+- **Frontend Web Dashboard**: [http://localhost:3000](http://localhost:3000)
+- **Backend API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)

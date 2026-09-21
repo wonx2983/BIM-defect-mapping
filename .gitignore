@@ -38,6 +38,7 @@ yarn-error.log*
 *.onnx
 *.pth
 *.safetensors
+!backend/ml/models/defect_detector.pt
 
 # Data & Uploads
 uploads/
