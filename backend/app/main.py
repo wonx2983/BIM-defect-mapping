@@ -16,6 +16,8 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.video import router as video_router
 from app.api.v1.bim import router as bim_router
 from app.api.v1.cameras import router as cameras_router
+from app.api.v1.markers import router as markers_router
+from app.api.v1.calibration import router as calibration_router
 
 settings = get_settings()
 
@@ -48,6 +50,8 @@ app.include_router(dashboard_router)
 app.include_router(video_router)
 app.include_router(bim_router)
 app.include_router(cameras_router)
+app.include_router(markers_router)
+app.include_router(calibration_router)
 
 # Serve uploaded files as static assets (local storage mode)
 if settings.is_local_storage:

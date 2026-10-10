@@ -45,6 +45,10 @@ class CameraCreate(BaseModel):
     frame_skip: int = 15
     auto_detect_enabled: bool = False
     auto_detect_interval_minutes: int = 15
+    # Phase 2: optional intrinsics at creation time
+    fov_horizontal_deg: float | None = None
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 class CameraUpdate(BaseModel):
@@ -60,6 +64,10 @@ class CameraUpdate(BaseModel):
     is_active: bool | None = None
     auto_detect_enabled: bool | None = None
     auto_detect_interval_minutes: int | None = None
+    # Phase 2: calibration fields
+    fov_horizontal_deg: float | None = None
+    image_width: int | None = None
+    image_height: int | None = None
 
 
 class CameraResponse(BaseModel):
@@ -83,6 +91,18 @@ class CameraResponse(BaseModel):
     created_by_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    # Phase 2: calibration data
+    intrinsics: dict | None = None
+    fov_horizontal_deg: float | None = None
+    image_width: int | None = None
+    image_height: int | None = None
+    pose_rotation: dict | None = None
+    pose_translation: dict | None = None
+    calibration_status: str = "uncalibrated"
+    calibration_error_px: float | None = None
+    calibrated_with_marker_id: uuid.UUID | None = None
+    calibrated_at: datetime | None = None
+    candidate_element_guids: dict | None = None
 
     model_config = {"from_attributes": True}
 

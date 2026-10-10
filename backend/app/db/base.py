@@ -8,4 +8,6 @@ from app.models import (  # noqa: F401
     BIMModel,
     Inspection,
     Defect,
+    Camera,
+    FiducialMarker,
 )

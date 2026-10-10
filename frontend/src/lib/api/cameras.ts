@@ -18,6 +18,18 @@ export interface Camera {
   last_detection_at: string | null;
   total_defects_found: number;
   created_at: string;
+  // Phase 2: calibration fields
+  intrinsics: { fx: number; fy: number; cx: number; cy: number } | null;
+  fov_horizontal_deg: number | null;
+  image_width: number | null;
+  image_height: number | null;
+  pose_rotation: Record<string, unknown> | null;
+  pose_translation: { x: number; y: number; z: number } | null;
+  calibration_status: string;
+  calibration_error_px: number | null;
+  calibrated_with_marker_id: string | null;
+  calibrated_at: string | null;
+  candidate_element_guids: string[] | null;
 }
 
 export interface CameraDetectionResult {
