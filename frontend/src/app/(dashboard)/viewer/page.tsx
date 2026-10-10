@@ -13,8 +13,14 @@ import {
 import { api } from '@/lib/api';
 import {
   Upload, MapPin, Video, Info, Plus, Trash2, Play, Loader,
-  Target, X, Eye, Wifi, ChevronDown,
+  Target, X, Eye, Wifi, ChevronDown, Crosshair, CheckCircle2, AlertTriangle, Settings,
 } from 'lucide-react';
+import {
+  getMarkers, createMarker, deleteMarker,
+  calibrateCamera, getCalibrationStatus,
+  runAutoMappedDetection,
+  type FiducialMarker, type CalibrationResult,
+} from '@/lib/api/calibration';
 import styles from './viewer.module.css';
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -26,7 +32,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-type SidePanelTab = 'defects' | 'cameras' | 'properties';
+type SidePanelTab = 'defects' | 'cameras' | 'markers' | 'properties';
 
 function formatClass(cls: string) {
   return cls.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -61,9 +67,21 @@ export default function ViewerPage() {
 
   // Camera form
   const [showCameraForm, setShowCameraForm] = useState(false);
-  const [cameraForm, setCameraForm] = useState({ name: '', rtsp_url: '', zone_label: '', location: '' });
+  const [cameraForm, setCameraForm] = useState({ name: '', rtsp_url: '', zone_label: '', location: '', fov: '' });
   const [cameraDetecting, setCameraDetecting] = useState<string | null>(null);
   const [cameraResult, setCameraResult] = useState<CameraDetectionResult | null>(null);
+
+  // Calibration
+  const [calibratingCameraId, setCalibratingCameraId] = useState<string | null>(null);
+  const [calibrationFov, setCalibrationFov] = useState('90');
+
+  // Markers
+  const [markers, setMarkers] = useState<FiducialMarker[]>([]);
+  const [showMarkerForm, setShowMarkerForm] = useState(false);
+  const [markerForm, setMarkerForm] = useState({
+    marker_dict_id: '0', physical_size_m: '0.20', description: '',
+  });
+  const [registeringMarker, setRegisteringMarker] = useState(false);
 
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,13 +108,15 @@ export default function ViewerPage() {
       getBIMModels(projectId).catch(() => ({ models: [], total: 0 })),
       getMappedDefects(projectId).catch(() => null),
       getCameras(projectId).catch(() => ({ cameras: [], total: 0 })),
-    ]).then(([bimData, defects, cameraData]) => {
+      getMarkers(projectId).catch(() => ({ markers: [], total: 0 })),
+    ]).then(([bimData, defects, cameraData, markerData]) => {
       setBimModels(bimData.models);
       if (bimData.models.length > 0 && !selectedModel) {
         setSelectedModel(bimData.models[0]);
       }
       if (defects) setDefectsData(defects);
       setCameras(cameraData.cameras);
+      setMarkers(markerData.markers);
     }).finally(() => setIsLoading(false));
   }, [projectId]);
 
@@ -644,6 +664,7 @@ export default function ViewerPage() {
   const panelTabs = [
     { id: 'defects' as SidePanelTab, icon: MapPin, label: 'Defects', count: (defectsData?.mapped_count || 0) + (defectsData?.unmapped_count || 0) },
     { id: 'cameras' as SidePanelTab, icon: Video, label: 'Cameras', count: cameras.length },
+    { id: 'markers' as SidePanelTab, icon: Crosshair, label: 'Markers', count: markers.length },
     { id: 'properties' as SidePanelTab, icon: Info, label: 'Properties', count: 0 },
   ];
 
@@ -941,6 +962,84 @@ export default function ViewerPage() {
                       {cam.last_detection_at && ` • Last: ${new Date(cam.last_detection_at).toLocaleDateString()}`}
                       {cam.auto_detect_enabled && ` • Auto: every ${cam.auto_detect_interval_minutes}min`}
                     </div>
+
+                    {/* Calibration Status */}
+                    <div style={{ padding: '6px 0', borderTop: '1px solid hsl(0,0%,15%)', marginTop: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, marginBottom: 4 }}>
+                        {cam.calibration_status === 'calibrated' ? (
+                          <><CheckCircle2 size={12} style={{ color: '#2d8a5e' }} /> <span style={{ color: '#2d8a5e' }}>Calibrated</span></>
+                        ) : cam.calibration_status === 'calibrating' ? (
+                          <><Loader size={12} className="spinner" /> <span style={{ color: '#b8860b' }}>Calibrating...</span></>
+                        ) : cam.calibration_status === 'failed' ? (
+                          <><AlertTriangle size={12} style={{ color: '#cd6839' }} /> <span style={{ color: '#cd6839' }}>Calibration Failed</span></>
+                        ) : (
+                          <><Settings size={12} style={{ color: 'hsl(0,0%,50%)' }} /> <span style={{ color: 'hsl(0,0%,50%)' }}>Uncalibrated</span></>
+                        )}
+                        {cam.calibration_error_px != null && (
+                          <span style={{ color: 'hsl(0,0%,44%)', marginLeft: 'auto' }}>
+                            Error: {cam.calibration_error_px.toFixed(2)}px
+                          </span>
+                        )}
+                      </div>
+                      {cam.candidate_element_guids && (
+                        <div style={{ fontSize: 10, color: 'hsl(0,0%,44%)' }}>
+                          {Array.isArray(cam.candidate_element_guids) ? cam.candidate_element_guids.length : 0} elements in view
+                        </div>
+                      )}
+                      {calibratingCameraId === cam.id ? (
+                        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                          <input
+                            className="input"
+                            type="number"
+                            placeholder="FOV (deg)"
+                            value={calibrationFov}
+                            onChange={(e) => setCalibrationFov(e.target.value)}
+                            style={{ width: 80, fontSize: 11, padding: '4px 6px' }}
+                          />
+                          <button
+                            className={`${styles.cameraBtn} ${styles.cameraBtnPrimary}`}
+                            style={{ fontSize: 11 }}
+                            onClick={async () => {
+                              try {
+                                const res = await calibrateCamera(cam.id, {
+                                  fov_horizontal_deg: parseFloat(calibrationFov) || 90,
+                                });
+                                if (res.success) {
+                                  setError('');
+                                  // Refresh cameras to get updated calibration data
+                                  const camsData = await getCameras(projectId);
+                                  setCameras(camsData.cameras);
+                                } else {
+                                  setError(res.message || 'Calibration failed');
+                                }
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : 'Calibration failed');
+                              } finally {
+                                setCalibratingCameraId(null);
+                              }
+                            }}
+                          >
+                            <Crosshair size={11} /> Go
+                          </button>
+                          <button
+                            className={`${styles.cameraBtn}`}
+                            style={{ fontSize: 11 }}
+                            onClick={() => setCalibratingCameraId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          className={`${styles.cameraBtn} ${styles.cameraBtnPrimary}`}
+                          style={{ fontSize: 11, marginTop: 4, width: '100%' }}
+                          onClick={() => setCalibratingCameraId(cam.id)}
+                        >
+                          <Crosshair size={11} /> {cam.calibration_status === 'calibrated' ? 'Re-calibrate' : 'Calibrate'}
+                        </button>
+                      )}
+                    </div>
+
                     <div className={styles.cameraActions}>
                       <button
                         className={`${styles.cameraBtn} ${styles.cameraBtnPrimary}`}
@@ -949,7 +1048,7 @@ export default function ViewerPage() {
                       >
                         {cameraDetecting === cam.id
                           ? <><Loader size={12} className="spinner" /> Detecting...</>
-                          : <><Play size={12} /> Run Detection</>
+                          : <><Play size={12} /> {cam.calibration_status === 'calibrated' ? 'Auto-Map Detect' : 'Run Detection'}</>
                         }
                       </button>
                       <button
@@ -992,6 +1091,138 @@ export default function ViewerPage() {
                   <div style={{ padding: '24px 0', textAlign: 'center', color: 'hsl(0,0%,44%)', fontSize: 13 }}>
                     No cameras registered. Click &quot;Register Camera&quot; to add one.
                   </div>
+                )}
+              </>
+            )}
+
+            {/* ── Markers Tab ──────────────────────────────── */}
+            {activeTab === 'markers' && (
+              <>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowMarkerForm(!showMarkerForm)}
+                  style={{ width: '100%', fontSize: 12, marginBottom: 12 }}
+                >
+                  <Plus size={14} /> Register Marker
+                </button>
+
+                {showMarkerForm && (
+                  <div style={{ marginBottom: 16, padding: 12, background: 'hsl(0,0%,10%)', borderRadius: 8, border: '1px solid hsl(0,0%,18%)' }}>
+                    <div style={{ fontSize: 11, color: 'hsl(0,0%,60%)', marginBottom: 8 }}>
+                      Register a printed ArUco marker at a known BIM coordinate.
+                      {registeringMarker && selectedElementGuid
+                        ? <> Click a point on the BIM model to set the 3D position, or enter manually.</>
+                        : <> Select an element in the 3D viewer first, then register.</>
+                      }
+                    </div>
+                    <div className="input-group">
+                      <label style={{ fontSize: 11 }}>ArUco Marker ID</label>
+                      <input className="input" type="number" placeholder="0" min="0"
+                        value={markerForm.marker_dict_id}
+                        onChange={(e) => setMarkerForm({ ...markerForm, marker_dict_id: e.target.value })} />
+                    </div>
+                    <div className="input-group">
+                      <label style={{ fontSize: 11 }}>Marker Size (metres)</label>
+                      <input className="input" type="number" step="0.01" placeholder="0.20"
+                        value={markerForm.physical_size_m}
+                        onChange={(e) => setMarkerForm({ ...markerForm, physical_size_m: e.target.value })} />
+                    </div>
+                    <div className="input-group">
+                      <label style={{ fontSize: 11 }}>Description</label>
+                      <input className="input" placeholder="e.g. Column A12, east face"
+                        value={markerForm.description}
+                        onChange={(e) => setMarkerForm({ ...markerForm, description: e.target.value })} />
+                    </div>
+
+                    {selectedElementGuid && selectedElementProps && (
+                      <div style={{ padding: 8, background: 'hsl(0,0%,8%)', borderRadius: 6, fontSize: 11, marginBottom: 8 }}>
+                        <div style={{ color: '#2d8a5e', marginBottom: 4 }}>
+                          <CheckCircle2 size={11} style={{ display: 'inline' }} /> BIM Element Selected
+                        </div>
+                        <div style={{ color: 'hsl(0,0%,50%)' }}>
+                          GUID: {selectedElementGuid.substring(0, 16)}...
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        className="btn btn-primary"
+                        style={{ flex: 1, fontSize: 12 }}
+                        onClick={async () => {
+                          if (!projectId) return;
+                          try {
+                            const m = await createMarker({
+                              project_id: projectId,
+                              marker_dict_id: parseInt(markerForm.marker_dict_id) || 0,
+                              physical_size_m: parseFloat(markerForm.physical_size_m) || 0.20,
+                              bim_model_id: selectedModel?.id,
+                              bim_element_guid: selectedElementGuid || undefined,
+                              bim_point_description: markerForm.description || undefined,
+                              world_x: 0,
+                              world_y: 0,
+                              world_z: 0,
+                            });
+                            setMarkers((prev) => [m, ...prev]);
+                            setShowMarkerForm(false);
+                            setMarkerForm({ marker_dict_id: '0', physical_size_m: '0.20', description: '' });
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Failed to register marker');
+                          }
+                        }}
+                      >
+                        Save Marker
+                      </button>
+                      <button className="btn btn-secondary" style={{ fontSize: 12 }}
+                        onClick={() => setShowMarkerForm(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {markers.length > 0 ? (
+                  markers.map((m) => (
+                    <div key={m.id} className={styles.cameraItem}>
+                      <div className={styles.cameraHeader}>
+                        <span className={styles.cameraName}>
+                          <Crosshair size={12} /> Marker #{m.marker_dict_id}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'hsl(0,0%,50%)' }}>
+                          {m.aruco_dict_type.replace('DICT_', '')}
+                        </span>
+                      </div>
+                      {m.bim_point_description && (
+                        <div className={styles.cameraZone}>{m.bim_point_description}</div>
+                      )}
+                      <div className={styles.cameraMeta}>
+                        Position: ({m.world_x.toFixed(2)}, {m.world_y.toFixed(2)}, {m.world_z.toFixed(2)})
+                        &ensp;•&ensp;Size: {(m.physical_size_m * 100).toFixed(0)} cm
+                      </div>
+                      {m.bim_element_guid && (
+                        <div style={{ fontSize: 10, color: 'hsl(0,0%,44%)', marginTop: 2 }}>
+                          Element: {m.bim_element_guid.substring(0, 16)}...
+                        </div>
+                      )}
+                      <div className={styles.cameraActions}>
+                        <button
+                          className={`${styles.cameraBtn} ${styles.cameraBtnDanger}`}
+                          onClick={async () => {
+                            await deleteMarker(m.id);
+                            setMarkers((prev) => prev.filter((mk) => mk.id !== m.id));
+                          }}
+                        >
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  !showMarkerForm && (
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'hsl(0,0%,44%)', fontSize: 13 }}>
+                      No markers registered. Markers are needed for camera calibration.
+                    </div>
+                  )
                 )}
               </>
             )}
