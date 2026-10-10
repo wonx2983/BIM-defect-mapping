@@ -154,21 +154,33 @@ async def run_camera_detection(
 ):
     """Run defect detection on a camera's RTSP feed and auto-map results to BIM.
 
-    This connects to the camera's RTSP stream, runs YOLOv11 on sampled frames,
-    and automatically sets bim_element_guid and world_position on each detected
-    defect from the camera's registered BIM link.
+    Behavior depends on calibration status:
+      - **Calibrated**: Routes to the Phase 2 auto-mapping pipeline which uses
+        PnP pose + raycasting for per-pixel BIM element mapping.
+      - **Uncalibrated**: Falls back to Phase 1 zone-based mapping which assigns
+        all detections to the camera's single bim_element_guid.
     """
     result = await db.execute(select(Camera).where(Camera.id == camera_id))
     camera = result.scalar_one_or_none()
     if not camera:
         raise NotFoundError("Camera not found")
 
+    # ── Phase 2: Calibrated → auto-mapping via raycasting ────────────
+    if (
+        camera.calibration_status == "calibrated"
+        and camera.pose_rotation is not None
+        and camera.pose_translation is not None
+        and camera.intrinsics is not None
+    ):
+        from app.api.v1.calibration import run_auto_mapped_detection
+        return await run_auto_mapped_detection(camera_id, max_frames, db, user)
+
+    # ── Phase 1: Uncalibrated → simple zone-based mapping ────────────
     detector = get_detector()
 
     from ml.inference.video_processor import (
         process_rtsp_frames,
         FrameDetection,
-        _deduplicate_detections,
         _iou,
     )
 
@@ -221,7 +233,7 @@ async def run_camera_detection(
                         status=DefectStatus.DETECTED,
                         created_by_id=user.id,
                         notes=f"Auto-detected from camera '{camera.name}' at frame {fd.frame_index}",
-                        # ── BIM AUTO-MAPPING ──
+                        # ── BIM AUTO-MAPPING (simple mode) ──
                         bim_element_guid=camera.bim_element_guid,
                         world_position=camera.world_position,
                     )
