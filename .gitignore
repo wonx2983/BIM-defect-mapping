@@ -58,3 +58,6 @@ backend/.test-postgres-run/
 .env.production
 backend/.auditdeps/
 *.tsbuildinfo
+/runs/bim-simulation.zip
+/runs/bim-simulation/.ultralytics/
+/runs/bim-simulation/chapters/

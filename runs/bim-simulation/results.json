@@ -1,0 +1,298 @@
+{
+  "ifc_header": "20141208_14047_werktekening.ifc",
+  "ifc_sha256": "2c3565ca1904f2aa61adab92024cf3755b2c5b21a498144d3094d7cb58cebec7",
+  "ifc_mesh_count": 2591,
+  "weights_sha256": "f491db792a11bcc07a0d38ddd11bf3667bf6497b29a8f711616c12aa41ea59df",
+  "resolution": [
+    1280,
+    720
+  ],
+  "horizontal_fov_deg": 57.0,
+  "virtual_camera_xyz": [
+    13.243017904464994,
+    -18.58132695399422,
+    5.4750793646255005
+  ],
+  "virtual_camera_rotation": [
+    [
+      0.9976931840471924,
+      0.0678845380464143,
+      -0.0
+    ],
+    [
+      -0.0018426450090560029,
+      0.02708119431993183,
+      -0.9996315389049991
+    ],
+    [
+      -0.06785952523519208,
+      0.9973255729241234,
+      0.027143810094076827
+    ]
+  ],
+  "marker": {
+    "id": "simulated-marker-17",
+    "marker_dict_id": 17,
+    "aruco_dict_type": "DICT_4X4_50",
+    "physical_size_m": 1.1434497459839847,
+    "rotation_deg": 0,
+    "world_x": 8.166187422767976,
+    "world_y": 6.763999950969996,
+    "world_z": 4.650255896098247,
+    "normal_x": -0.0,
+    "normal_y": -1.0,
+    "normal_z": -0.0
+  },
+  "decoded_marker_id": 17,
+  "calibration_passed": true,
+  "calibration_error": "",
+  "calibration_candidate_count": 2540,
+  "missing_marker_rejected": true,
+  "missing_marker_result": "No ArUco markers detected in the frame. Ensure the marker is clearly visible, well-lit, and matches the selected dictionary type.",
+  "recovered_camera_xyz": [
+    13.655517121506648,
+    -18.458048699343443,
+    5.1936270798318
+  ],
+  "recovered_camera_rotation": [
+    [
+      0.9963996266574493,
+      0.08475291782779645,
+      -0.002174147320359622
+    ],
+    [
+      -0.005366731134518701,
+      0.03745969980290412,
+      -0.9992837280210292
+    ],
+    [
+      -0.08461076878167242,
+      0.9956976015891326,
+      0.03777967702116153
+    ]
+  ],
+  "reprojection_error_px": 0.06833836709893022,
+  "pose_error_cm": 51.43622466174147,
+  "confidence_threshold": 0.25,
+  "matching_iou_threshold": 0.5,
+  "inference_ms": {
+    "positive": 8770.066261291504,
+    "clean": 310.93597412109375
+  },
+  "detection_true_positives": 1,
+  "detection_false_positives": 1,
+  "detection_misses": [
+    "C1",
+    "C2",
+    "C3"
+  ],
+  "detections": {
+    "positive": [
+      {
+        "box": [
+          1109,
+          482,
+          1185,
+          516
+        ],
+        "defect_class": "efflorescence",
+        "confidence": 0.31299078464508057,
+        "severity": "medium",
+        "severity_score": 0.31637875639934054,
+        "best_unmatched_iou": 0.0,
+        "mapped_guid": "14XsuvhErDaQe9Ghiv9NHI",
+        "mapped_world": [
+          20.030819767659068,
+          0.7899999537849993,
+          3.6896460642133357
+        ],
+        "mapping_error": null,
+        "correct_element": null,
+        "error_cm": null
+      },
+      {
+        "box": [
+          448,
+          258,
+          517,
+          318
+        ],
+        "defect_class": "crack",
+        "confidence": 0.30493906140327454,
+        "severity": "low",
+        "severity_score": 0.23942174313217007,
+        "matches": "C4",
+        "best_unmatched_iou": 0.5985507246376811,
+        "mapped_guid": "05yuQkJxb22el7nxTgecJc",
+        "mapped_world": [
+          8.07170800636704,
+          6.76399995097,
+          7.738957469951011
+        ],
+        "mapping_error": null,
+        "correct_element": true,
+        "error_cm": 9.355660495633078
+      }
+    ],
+    "clean": [
+      {
+        "box": [
+          274,
+          638,
+          355,
+          687
+        ],
+        "defect_class": "efflorescence",
+        "confidence": 0.4454059898853302,
+        "severity": "medium",
+        "severity_score": 0.35168146759428265
+      },
+      {
+        "box": [
+          1108,
+          482,
+          1186,
+          517
+        ],
+        "defect_class": "efflorescence",
+        "confidence": 0.4125232696533203,
+        "severity": "medium",
+        "severity_score": 0.3355706016083477
+      },
+      {
+        "box": [
+          1105,
+          674,
+          1193,
+          703
+        ],
+        "defect_class": "efflorescence",
+        "confidence": 0.3352876901626587,
+        "severity": "medium",
+        "severity_score": 0.3677824391197398
+      }
+    ]
+  },
+  "mapping": [
+    {
+      "id": "C1",
+      "box": [
+        808,
+        290,
+        867,
+        315
+      ],
+      "element_guid": "2uaQbPNLX7DebbkESsYvDm",
+      "element_type": "IfcWall",
+      "element_name": "separatiewand",
+      "pixel": [
+        838,
+        302
+      ],
+      "world": [
+        16.031133056081373,
+        9.556523070726453,
+        7.607102136896405
+      ],
+      "mapped_guid": "2uaQbPNLX7DebbkESsYvDm",
+      "mapped_world": [
+        15.962771550705765,
+        9.556523070648737,
+        7.599789128274283
+      ],
+      "mapping_error": null,
+      "correct_element": true,
+      "error_cm": 6.875154916310203
+    },
+    {
+      "id": "C2",
+      "box": [
+        799,
+        633,
+        835,
+        671
+      ],
+      "element_guid": "1FrPU10uj5vRBM$ME6kjwV",
+      "element_type": "IfcSlab",
+      "element_name": "dekvloer",
+      "pixel": [
+        817,
+        652
+      ],
+      "world": [
+        15.266762883457032,
+        6.6035655425235795,
+        -8.881784197001252e-16
+      ],
+      "mapped_guid": "1FrPU10uj5vRBM$ME6kjwV",
+      "mapped_world": [
+        15.229734119666784,
+        6.7002235309215195,
+        0.0
+      ],
+      "mapping_error": null,
+      "correct_element": true,
+      "error_cm": 10.350795171855296
+    },
+    {
+      "id": "C3",
+      "box": [
+        808,
+        404,
+        868,
+        455
+      ],
+      "element_guid": "3U4osC1p5EqwcBW8F2DJ6K",
+      "element_type": "IfcWall",
+      "element_name": "separatiewand",
+      "pixel": [
+        838,
+        430
+      ],
+      "world": [
+        16.01744507862848,
+        9.556523070414553,
+        4.57775090140481
+      ],
+      "mapped_guid": "3U4osC1p5EqwcBW8F2DJ6K",
+      "mapped_world": [
+        15.937368670194783,
+        9.556523070509453,
+        4.586681573528501
+      ],
+      "mapping_error": null,
+      "correct_element": true,
+      "error_cm": 8.057287441950429
+    },
+    {
+      "id": "C4",
+      "box": [
+        456,
+        269,
+        515,
+        311
+      ],
+      "element_guid": "05yuQkJxb22el7nxTgecJc",
+      "element_type": "IfcWallStandardCase",
+      "element_name": "separatiewand",
+      "pixel": [
+        486,
+        290
+      ],
+      "world": [
+        8.155261143578876,
+        6.76399995097,
+        7.696865765388058
+      ],
+      "mapped_guid": "05yuQkJxb22el7nxTgecJc",
+      "mapped_world": [
+        8.149224630565072,
+        6.76399995097,
+        7.6944443759124805
+      ],
+      "mapping_error": null,
+      "correct_element": true,
+      "error_cm": 0.6504046152838898
+    }
+  ]
+}

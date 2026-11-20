@@ -2,6 +2,8 @@
 
 An inspection platform under active field validation for real-time concrete defect detection, severity assessment, and automated 3D BIM spatial mapping — built for construction professionals, site engineers, and quality assurance managers.
 
+The [recorded Schependomlaan simulation](runs/bim-simulation/README.md) includes the virtual camera frames, detection and mapping scores, and a short walkthrough.
+
 ---
 
 ## Product Vision
