@@ -112,7 +112,7 @@ def report(out):
     dt{{font-weight:700}} dd{{margin:0 0 12px}} img,video{{display:block;width:100%;border-radius:8px}}
     table{{margin-top:18px;width:100%;border-collapse:collapse;font-size:.87em}}
     td,th{{text-align:left;padding:8px;border-bottom:1px solid #dce4e8}} a{{color:#085e83}}
-    </style><main><h1>DefectSync simulation record</h1>{summary}
+    </style><main><h1>DefectSync simulation record</h1>{summary.rstrip()}
     <p><a href="results.json">Raw results and provenance</a> · <a href="mapping.csv">Mapping measurements CSV</a> ·
     <a href="07-no-marker-control.png">Missing-marker input</a> · <a href="execution.txt">Execution log</a></p>
     <video controls preload="metadata" src="simulation.mp4"></video>{sections}{methodology}</main></html>""", encoding="utf-8")

@@ -76,62 +76,38 @@
   "confidence_threshold": 0.25,
   "matching_iou_threshold": 0.5,
   "inference_ms": {
-    "positive": 8770.066261291504,
-    "clean": 310.93597412109375
+    "positive": 9500.629186630249,
+    "clean": 192.12746620178223
   },
-  "detection_true_positives": 1,
+  "detection_true_positives": 0,
   "detection_false_positives": 1,
   "detection_misses": [
     "C1",
-    "C2",
-    "C3"
+    "C2"
   ],
   "detections": {
     "positive": [
       {
         "box": [
-          1109,
+          1108,
           482,
           1185,
           516
         ],
         "defect_class": "efflorescence",
-        "confidence": 0.31299078464508057,
+        "confidence": 0.3301430344581604,
         "severity": "medium",
-        "severity_score": 0.31637875639934054,
+        "severity_score": 0.31973251835239896,
         "best_unmatched_iou": 0.0,
         "mapped_guid": "14XsuvhErDaQe9Ghiv9NHI",
         "mapped_world": [
-          20.030819767659068,
+          20.023192299830868,
           0.7899999537849993,
-          3.6896460642133357
+          3.689611026175326
         ],
         "mapping_error": null,
         "correct_element": null,
         "error_cm": null
-      },
-      {
-        "box": [
-          448,
-          258,
-          517,
-          318
-        ],
-        "defect_class": "crack",
-        "confidence": 0.30493906140327454,
-        "severity": "low",
-        "severity_score": 0.23942174313217007,
-        "matches": "C4",
-        "best_unmatched_iou": 0.5985507246376811,
-        "mapped_guid": "05yuQkJxb22el7nxTgecJc",
-        "mapped_world": [
-          8.07170800636704,
-          6.76399995097,
-          7.738957469951011
-        ],
-        "mapping_error": null,
-        "correct_element": true,
-        "error_cm": 9.355660495633078
       }
     ],
     "clean": [
@@ -233,66 +209,6 @@
       "mapping_error": null,
       "correct_element": true,
       "error_cm": 10.350795171855296
-    },
-    {
-      "id": "C3",
-      "box": [
-        808,
-        404,
-        868,
-        455
-      ],
-      "element_guid": "3U4osC1p5EqwcBW8F2DJ6K",
-      "element_type": "IfcWall",
-      "element_name": "separatiewand",
-      "pixel": [
-        838,
-        430
-      ],
-      "world": [
-        16.01744507862848,
-        9.556523070414553,
-        4.57775090140481
-      ],
-      "mapped_guid": "3U4osC1p5EqwcBW8F2DJ6K",
-      "mapped_world": [
-        15.937368670194783,
-        9.556523070509453,
-        4.586681573528501
-      ],
-      "mapping_error": null,
-      "correct_element": true,
-      "error_cm": 8.057287441950429
-    },
-    {
-      "id": "C4",
-      "box": [
-        456,
-        269,
-        515,
-        311
-      ],
-      "element_guid": "05yuQkJxb22el7nxTgecJc",
-      "element_type": "IfcWallStandardCase",
-      "element_name": "separatiewand",
-      "pixel": [
-        486,
-        290
-      ],
-      "world": [
-        8.155261143578876,
-        6.76399995097,
-        7.696865765388058
-      ],
-      "mapped_guid": "05yuQkJxb22el7nxTgecJc",
-      "mapped_world": [
-        8.149224630565072,
-        6.76399995097,
-        7.6944443759124805
-      ],
-      "mapping_error": null,
-      "correct_element": true,
-      "error_cm": 0.6504046152838898
     }
   ]
 }

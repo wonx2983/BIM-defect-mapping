@@ -208,6 +208,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ifc", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--crack-count", type=int, choices=range(1, 6),
+                        help="Use the first N eligible cracks in the fixed scene order")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("YOLO_CONFIG_DIR", str((args.out / ".ultralytics").resolve()))
@@ -263,8 +265,12 @@ def main():
                           element_type=types[owner], element_name=elements[owner].Name,
                           pixel=[x, y], world=surface_point((x, y), depth, position, rotation, intrinsics).tolist()))
         cv2.circle(occupied.view(np.uint8), pixel, max(56, int(radius)), 1, -1)
+        if len(truth) == args.crack_count:
+            break
     if not truth:
         raise RuntimeError("No suitable surfaces for test cracks")
+    if args.crack_count is not None and len(truth) != args.crack_count:
+        raise RuntimeError(f"Placed {len(truth)} of {args.crack_count} requested cracks")
 
     cal = calibrate_camera_from_frame(positive, [registry], fov_horizontal_deg=FOV, ifc_path=args.ifc)
     no_marker = calibrate_camera_from_frame(frame, [registry], fov_horizontal_deg=FOV, ifc_path=args.ifc)
