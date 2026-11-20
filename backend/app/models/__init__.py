@@ -32,3 +32,4 @@ __all__ = [
 
 
 from app.models.audit import AuditEvent
+from app.models.monitoring_worker import MonitoringWorker

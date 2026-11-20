@@ -37,6 +37,76 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/cameras", tags=["Cameras"])
 
 
+@router.get("/monitoring/status")
+async def monitoring_status(db: AsyncSession = Depends(get_db),
+                            user: User = Depends(get_current_active_user)):
+    from datetime import timedelta
+    from app.models.monitoring_worker import MonitoringWorker
+    count = await db.scalar(select(func.count()).select_from(MonitoringWorker).where(
+        MonitoringWorker.last_seen > datetime.now(timezone.utc) - timedelta(seconds=45)))
+    return {"available": bool(count), "active_workers": count}
+
+
+@router.get("/{camera_id}/preview")
+async def preview_camera(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                         user: User = Depends(get_current_active_user)):
+    import cv2
+    from fastapi.responses import Response
+    from ml.calibration.marker_detector import grab_frame_from_rtsp, detect_markers
+    from app.models.fiducial_marker import FiducialMarker
+    camera = await db.get(Camera, camera_id)
+    if camera is None:
+        raise NotFoundError("Camera not found")
+    await project_access(camera.project_id, user, db)
+    markers = (await db.scalars(select(FiducialMarker).where(
+        FiducialMarker.project_id == camera.project_id,
+        FiducialMarker.bim_model_id == camera.bim_model_id))).all()
+    patterns = {(marker.aruco_dict_type, marker.marker_dict_id) for marker in markers}
+    source = camera.rtsp_url
+    def capture_preview():
+        frame = grab_frame_from_rtsp(source)
+        for dictionary in sorted({pattern[0] for pattern in patterns} or {"DICT_4X4_50"}):
+            for found in detect_markers(frame, dictionary):
+                registered = (dictionary, found.marker_id) in patterns
+                colour = (0, 180, 0) if registered else (0, 120, 255)
+                cv2.polylines(frame, [found.corners.astype('int32')], True, colour, 2)
+                point = tuple(found.corners[0].astype(int))
+                label = f"{dictionary} ID {found.marker_id}: {'registered' if registered else 'unregistered'}"
+                cv2.putText(frame, label, point, cv2.FONT_HERSHEY_SIMPLEX, .6, colour, 2)
+        return cv2.imencode(".jpg", frame)
+    success, encoded = await run_blocking(capture_preview)
+    if not success:
+        from app.core.exceptions import ValidationError
+        raise ValidationError("Unable to encode camera preview")
+    return Response(encoded.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/{camera_id}/start-monitoring", response_model=CameraResponse)
+async def start_monitoring(camera_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                           user: User = Depends(get_current_active_user)):
+    from app.api.v1.calibration import calibrate_camera
+    from app.schemas.calibration import CalibrateRequest
+    from app.core.exceptions import AppException, ValidationError
+    camera = await db.get(Camera, camera_id)
+    if camera is None:
+        raise NotFoundError("Camera not found")
+    await project_access(camera.project_id, user, db)
+    if not camera.bim_model_id or not camera.fov_horizontal_deg:
+        raise ValidationError("Select a BIM model and supply the camera's horizontal field of view")
+    worker = await monitoring_status(db, user)
+    if not worker["available"]:
+        raise AppException("Monitoring worker is offline. Start the camera worker and retry.", "WORKER_OFFLINE", 503)
+    result = await calibrate_camera(camera_id, CalibrateRequest(fov_horizontal_deg=camera.fov_horizontal_deg), db, user)
+    if not result.success:
+        raise ValidationError(result.message)
+    camera.auto_detect_enabled = True
+    camera.is_active = True
+    camera.last_attempt_at = None
+    await db.flush()
+    await db.refresh(camera)
+    return CameraResponse.model_validate(camera)
+
+
 async def _verify_project_access(
     project_id: uuid.UUID, user: User, db: AsyncSession
 ) -> None:

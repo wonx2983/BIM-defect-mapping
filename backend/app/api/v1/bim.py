@@ -62,10 +62,10 @@ async def upload_bim_model(
 
     file_path, file_size = await stream_upload(file, proj_id, "bim", 100 * 1024 * 1024, ALLOWED_IFC_EXTENSIONS)
     try:
-        from ml.calibration.ifc_geometry import extract_meshes_from_ifc
-        meshes = await run_blocking(extract_meshes_from_ifc, file_path)
-        if not meshes:
-            raise ValidationError("IFC contains no supported element geometry")
+        from ml.calibration.ifc_geometry import inspect_ifc_model
+        element_count = await run_blocking(inspect_ifc_model, file_path)
+        if not element_count:
+            raise ValidationError("IFC contains no represented building elements")
     except Exception:
         file_path.unlink(missing_ok=True)
         raise
@@ -77,7 +77,7 @@ async def upload_bim_model(
         original_filename=file.filename or "model.ifc",
         file_url=file_url,
         file_size_bytes=file_size,
-        element_count=len(meshes),
+        element_count=element_count,
         processing_status=ProcessingStatus.READY,
         uploaded_by_id=user.id,
     )

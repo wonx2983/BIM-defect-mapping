@@ -42,7 +42,7 @@ def main():
     command.upgrade(config, "head")
     with psycopg.connect(f"host=127.0.0.1 port=55432 user=audit_test dbname={name}") as conn:
         assert conn.execute("SELECT calibration_status FROM cameras WHERE id=%s", (camera,)).fetchone()[0] == "uncalibrated"
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "20261118_hardening"
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "20261120_marker_identity"
     print("PASS: populated pre-calibration database upgraded successfully")
     # Drop only the unique database created by this test, never a configured DB.
     with psycopg.connect(admin, autocommit=True) as conn:

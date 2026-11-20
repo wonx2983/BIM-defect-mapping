@@ -91,7 +91,16 @@ def calibrate_camera_from_frame(
         )
 
     # Step 2: Detect ArUco markers
-    detected = detect_markers(frame, dict_type=aruco_dict_type)
+    matches = []
+    detected = []
+    dictionaries = {entry.get("aruco_dict_type", aruco_dict_type) for entry in marker_registry}
+    for dictionary in sorted(dictionaries):
+        registry = {entry["marker_dict_id"]: entry for entry in marker_registry
+                    if entry.get("aruco_dict_type", aruco_dict_type) == dictionary}
+        found = detect_markers(frame, dict_type=dictionary)
+        detected.extend(found)
+        matches.extend((marker, registry[marker.marker_id]) for marker in found
+                       if marker.marker_id in registry)
     if not detected:
         return CalibrationResult(
             success=False,
@@ -104,13 +113,6 @@ def calibrate_camera_from_frame(
         )
 
     # Step 3: Match against registry
-    registry_by_id: dict[int, dict] = {}
-    for entry in marker_registry:
-        if entry.get("aruco_dict_type", "DICT_4X4_50") == aruco_dict_type:
-            registry_by_id[entry["marker_dict_id"]] = entry
-
-    matches = [(det, registry_by_id[det.marker_id]) for det in detected
-               if det.marker_id in registry_by_id]
     if not matches:
         return CalibrationResult(success=False, intrinsics=intrinsics,
             image_width=w, image_height=h,

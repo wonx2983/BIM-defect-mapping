@@ -35,7 +35,15 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
 
 export async function responseError(response: Response): Promise<string> {
   const body = await response.json().catch(() => ({}));
-  if (Array.isArray(body.detail)) return body.detail.map((item: {msg: string}) => item.msg).join('; ');
+  if (Array.isArray(body.detail)) {
+    return body.detail.map((item: { msg: string; loc?: (string | number)[]; type?: string }) => {
+      const field = item.loc?.slice(1).join('.');
+      if (field === 'marker_dict_id' && item.type === 'missing') {
+        return 'This backend requires a manually assigned marker ID. Restart it with the updated code to assign IDs automatically.';
+      }
+      return field ? `${field}: ${item.msg}` : item.msg;
+    }).join('; ');
+  }
   return typeof body.detail === 'string' ? body.detail : `Request failed (${response.status})`;
 }
 

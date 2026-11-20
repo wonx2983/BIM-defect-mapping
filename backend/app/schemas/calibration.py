@@ -13,8 +13,8 @@ class MarkerCreate(BaseModel):
     """Register a new fiducial marker at a known BIM coordinate."""
 
     project_id: uuid.UUID
-    marker_dict_id: int = Field(
-        ..., ge=0, description="ArUco marker ID from the printed pattern",
+    marker_dict_id: int | None = Field(
+        default=None, ge=0, description="Printed pattern ID; omit to allocate an unused ID",
     )
     aruco_dict_type: str = Field(
         default="DICT_4X4_50",
@@ -44,6 +44,12 @@ class MarkerCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_geometry(self):
+        from ml.calibration.marker_detector import ARUCO_DICT_MAP
+        if self.aruco_dict_type not in ARUCO_DICT_MAP:
+            raise ValueError("Unsupported ArUco dictionary")
+        capacity = int(self.aruco_dict_type.rsplit("_", 1)[1])
+        if self.marker_dict_id is not None and self.marker_dict_id >= capacity:
+            raise ValueError(f"Marker ID must be between 0 and {capacity - 1}")
         values = [self.world_x, self.world_y, self.world_z, self.normal_x, self.normal_y, self.normal_z]
         if not all(math.isfinite(v) for v in values) or sum(v*v for v in values[3:]) < 1e-12:
             raise ValueError("Coordinates must be finite and surface normal nonzero")

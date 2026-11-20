@@ -63,6 +63,13 @@ def _file_hash(path: str | Path) -> str:
     return h.hexdigest()
 
 
+def inspect_ifc_model(ifc_path: str | Path) -> int:
+    """Validate the IFC and count represented elements without triangulating it."""
+    _ensure_ifcopenshell()
+    model = _ifcopenshell.open(str(ifc_path))
+    return sum(1 for element in model.by_type("IfcElement") if element.Representation)
+
+
 def extract_meshes_from_ifc(
     ifc_path: str | Path,
     element_types: list[str] | None = None,
@@ -130,7 +137,7 @@ def extract_meshes_from_ifc(
 
         for element in elements:
             guid = element.GlobalId
-            if not guid:
+            if not guid or guid in meshes:
                 continue
 
             try:

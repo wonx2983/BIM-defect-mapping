@@ -1,9 +1,12 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: path.resolve(__dirname),
   skipTrailingSlashRedirect: true,
   experimental: {
+    proxyTimeout: 600_000,
     // Allow 500 MiB video uploads plus multipart headers through API rewrites.
     middlewareClientMaxBodySize: '501mb',
   },

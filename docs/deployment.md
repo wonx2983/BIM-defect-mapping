@@ -12,7 +12,7 @@ Run backend `pytest tests -q`, frontend `npm run typecheck`, `npm run lint`, and
 
 Back up the database and verify restoration before a live upgrade. Review `20261118_hardening`: it adds marker rotation, BIM model identity on defects, camera scheduling leases, and append-only defect change history. Existing pre-calibration camera rows receive an `uncalibrated` default. Historical water-seepage defects remain readable. Existing mapped defects have no model ID: review and remap them to an explicit model version; do not guess which model they belong to.
 
-Run `alembic upgrade head` in the backend environment during a controlled maintenance window. No migration has been applied to the user's remote database by this task. The `/ready` endpoint returns 503 until the expected migration and model are available; `/health` is a liveness endpoint only.
+Run `alembic upgrade head` in the backend environment during a controlled maintenance window. Revision `20261120_marker_identity` enforces unique marker patterns within each project and adds a table for camera worker health. The `/ready` endpoint returns 503 until the expected migration and model are available. The `/health` endpoint checks liveness.
 
 ## Hosting
 
@@ -24,7 +24,11 @@ Build with `docker compose -f compose.production.yml build`. Review the image an
 
 ## Cameras and calibration
 
-Register one or more visible markers against the same BIM model. Enter surveyed IFC-world coordinates in metres, surface normals, and printed-marker rotation. The default local marker basis is constructed in `pose_solver.transform_object_points_to_world`; rotation is around the outward normal. Use measured lens intrinsics/distortion for quantitative work. FOV-derived intrinsics are approximate. Verify independent surveyed checkpoints across the entire image, not only marker reprojection error.
+In the BIM Viewer, select a model and open Markers. Find the IFC element by name, type or GUID, then click its face at the intended marker centre. Use measured offsets if the installation references a corner. Check the displayed facing direction and top edge, then save to assign the pattern ID. Download the print from the marker card, print at 100% scale, and measure the black square before mounting it. Each physical location needs its own pattern within the project. One visible registered marker can calibrate each fixed camera.
+
+Under Cameras, enter the RTSP source, horizontal lens field of view and inspection interval. The default save action attempts calibration and queues the first inspection when the worker is online. If calibration fails, the camera stays registered and can be previewed and retried from its card. The Video and Detection tabs require no separate camera registration. For local development, run the worker from `backend` with `SCHEDULER_ENABLED=true` and `python -m app.services.scheduler` in the backend Python environment.
+
+Use measured lens intrinsics and distortion for quantitative work. FOV-derived intrinsics are approximate. Verify independent surveyed checkpoints across the entire image in addition to checking marker reprojection error.
 
 Calibration rejects fits above two pixels and insufficient marker evidence. Source/model/FOV/resolution changes invalidate calibration and disable scheduling. A scheduled worker must actually be running; enabling a camera flag alone does not start a process. The worker uses persisted claims, retries on the configured interval, and records failure status. It performs finite inspection batches, not a low-latency continuous stream. Confirm reconnection, movement, stale-frame, multiple-camera, and prolonged outage behavior on actual hardware.
 

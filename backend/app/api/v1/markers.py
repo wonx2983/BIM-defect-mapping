@@ -77,6 +77,18 @@ async def create_marker(
     """
     await _verify_project_access(body.project_id, user, db)
 
+    # Serialize allocations for a project, including concurrent camera installers.
+    await db.execute(select(Project).where(Project.id == body.project_id).with_for_update())
+    if body.marker_dict_id is None:
+        used = set((await db.scalars(select(FiducialMarker.marker_dict_id).where(
+            FiducialMarker.project_id == body.project_id,
+            FiducialMarker.aruco_dict_type == body.aruco_dict_type))).all())
+        capacity = int(body.aruco_dict_type.rsplit("_", 1)[1])
+        body.marker_dict_id = next((index for index in range(capacity) if index not in used), None)
+        if body.marker_dict_id is None:
+            from app.core.exceptions import ValidationError
+            raise ValidationError("All marker IDs in this dictionary are in use")
+
     # Check for duplicate marker_dict_id within the same project
     existing = await db.execute(
         select(FiducialMarker).where(
@@ -200,3 +212,30 @@ async def _invalidate_project_cameras(project_id, db):
     for camera in (await db.scalars(select(Camera).where(Camera.project_id == project_id))).all():
         invalidate_calibration(camera)
         camera.calibrated_with_marker_id = None
+
+
+@router.get("/{marker_id}/print")
+async def print_marker(marker_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+                       user: User = Depends(get_current_active_user)):
+    """Download a dimensioned marker with a white quiet zone and print instructions."""
+    import cv2
+    from fastapi.responses import Response
+    from ml.calibration.marker_detector import ARUCO_DICT_MAP
+    marker = await db.get(FiducialMarker, marker_id)
+    if marker is None:
+        raise NotFoundError("Marker not found")
+    await _verify_project_access(marker.project_id, user, db)
+    dictionary = cv2.aruco.getPredefinedDictionary(ARUCO_DICT_MAP[marker.aruco_dict_type])
+    cells = dictionary.markerSize + 2
+    pattern = cv2.aruco.generateImageMarker(dictionary, marker.marker_dict_id, cells)
+    rects = ''.join(f'<rect x="{x + 1}" y="{y + 1}" width="1" height="1"/>'
+                    for y in range(cells) for x in range(cells) if pattern[y, x] == 0)
+    width_mm = marker.physical_size_m * 1000 * (cells + 2) / cells
+    svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width_mm}mm" height="{width_mm}mm" '
+           f'viewBox="0 0 {cells + 2} {cells + 2}">'
+           f'<title>Marker {marker.marker_dict_id}; print at 100%; black square side '
+           f'{marker.physical_size_m * 1000:g} mm; top edge is the top of this page</title>'
+           f'<rect width="100%" height="100%" fill="white"/><g fill="black" shape-rendering="crispEdges">'
+           f'{rects}</g></svg>')
+    return Response(svg, media_type="image/svg+xml", headers={
+        "Content-Disposition": f'attachment; filename="marker-{marker.marker_dict_id}.svg"'})

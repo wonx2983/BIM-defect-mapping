@@ -9,7 +9,7 @@ for the camera's pose via PnP.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,7 @@ class FiducialMarker(Base):
     """
 
     __tablename__ = "fiducial_markers"
+    __table_args__ = (UniqueConstraint("project_id", "aruco_dict_type", "marker_dict_id", name="uq_project_marker_pattern"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))

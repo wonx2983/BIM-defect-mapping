@@ -88,7 +88,7 @@ async def readiness():
         async with async_session_factory() as db:
             await db.execute(text("SELECT 1"))
             revision = await db.scalar(text("SELECT version_num FROM alembic_version"))
-            if revision != "20261118_hardening":
+            if revision != "20261120_marker_identity":
                 return JSONResponse({"status": "not_ready", "reason": "database_migration_required"}, status_code=503)
         await run_blocking(get_detector)
     except Exception:

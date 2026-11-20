@@ -103,7 +103,7 @@ async def calibrate_camera(
             success=False,
             calibration_status="failed",
             message="No fiducial markers registered for this project. "
-                    "Register at least two markers before calibrating.",
+                    "Register at least one marker for this BIM model before calibrating.",
         )
 
     marker_registry = [

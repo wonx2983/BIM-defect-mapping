@@ -25,7 +25,7 @@ export interface FiducialMarker {
 
 export interface MarkerCreateData {
   project_id: string;
-  marker_dict_id: number;
+  marker_dict_id?: number;
   aruco_dict_type?: string;
   bim_model_id?: string;
   bim_element_guid?: string;

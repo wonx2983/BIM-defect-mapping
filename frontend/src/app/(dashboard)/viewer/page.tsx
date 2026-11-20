@@ -1,6 +1,7 @@
 'use client';
 
-import { authenticatedFetch } from '@/lib/api';
+import { api, authenticatedFetch, responseError } from '@/lib/api';
+import MarkerPlacement, { type BIMElementOption } from '@/components/MarkerPlacement';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
@@ -53,6 +54,7 @@ export default function ViewerPage() {
   const componentsRef = useRef<any>(null);
   const worldRef = useRef<any>(null);
   const fragmentsRef = useRef<any>(null);
+  const loadedModelRef = useRef<string | null>(null);
 
   // Side panel
   const [activeTab, setActiveTab] = useState<SidePanelTab>('defects');
@@ -72,16 +74,22 @@ export default function ViewerPage() {
 
   // Calibration
   const [calibratingCameraId, setCalibratingCameraId] = useState<string | null>(null);
-  const [calibrationFov, setCalibrationFov] = useState('90');
+  const [calibrationFov, setCalibrationFov] = useState('');
 
   // Markers
   const [markers, setMarkers] = useState<FiducialMarker[]>([]);
   const [showMarkerForm, setShowMarkerForm] = useState(false);
   const [markerForm, setMarkerForm] = useState({
-    marker_dict_id: '0', physical_size_m: '0.20', description: '',
+    physical_size_m: '0.20', description: '',
     world_x: '', world_y: '', world_z: '', normal_x: '0', normal_y: '0', normal_z: '1', rotation_deg: '0',
   });
-  const registeringMarker = false;
+  const [markerSaving, setMarkerSaving] = useState(false);
+  const [elements, setElements] = useState<BIMElementOption[]>([]);
+  const [cameraSaving, setCameraSaving] = useState(false);
+  const [monitoringAvailable, setMonitoringAvailable] = useState(false);
+  const [cameraPreview, setCameraPreview] = useState<string | null>(null);
+  const [inspectionInterval, setInspectionInterval] = useState('15');
+  const [startOnSave, setStartOnSave] = useState(true);
 
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +102,58 @@ export default function ViewerPage() {
   // 3D tooltip for defect pins
   const [pinTooltip, setPinTooltip] = useState<{ x: number; y: number; label: string; severity: string } | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const status = await api.get<{ available: boolean }>('/api/v1/cameras/monitoring/status');
+        if (!cancelled) setMonitoringAvailable(status.available);
+        if (projectId) {
+          const result = await getCameras(projectId);
+          if (!cancelled) setCameras(result.cameras);
+        }
+      } catch { if (!cancelled) setMonitoringAvailable(false); }
+    };
+    void refresh();
+    const timer = setInterval(refresh, 10000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [projectId]);
+
+  useEffect(() => () => { if (cameraPreview) URL.revokeObjectURL(cameraPreview); }, [cameraPreview]);
+
+  useEffect(() => {
+    if (!componentsRef.current || !showMarkerForm || !markerForm.world_x) return;
+    const { THREE, scene } = componentsRef.current;
+    const normal = new THREE.Vector3(Number(markerForm.normal_x), Number(markerForm.normal_y), Number(markerForm.normal_z));
+    if (normal.lengthSq() < 1e-10) return;
+    normal.normalize();
+    const up = Math.abs(normal.y) > .9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const x = up.clone().cross(normal).normalize();
+    const y = normal.clone().cross(x);
+    const angle = Number(markerForm.rotation_deg) * Math.PI / 180;
+    const right = x.clone().multiplyScalar(Math.cos(angle)).addScaledVector(y, Math.sin(angle));
+    const top = y.clone().multiplyScalar(Math.cos(angle)).addScaledVector(x, -Math.sin(angle));
+    const display = (v: any) => new THREE.Vector3(v.x, v.z, -v.y);
+    const centre = new THREE.Vector3(Number(markerForm.world_x), Number(markerForm.world_y), Number(markerForm.world_z));
+    const side = Number(markerForm.physical_size_m);
+    if (!Number.isFinite(side) || side <= 0) return;
+    const corners = [[-1, 1], [1, 1], [1, -1], [-1, -1], [-1, 1]].map(([a, b]) =>
+      display(centre.clone().addScaledVector(right, a * side / 2).addScaledVector(top, b * side / 2)));
+    const group = new THREE.Group();
+    const geometry = new THREE.BufferGeometry().setFromPoints(corners);
+    const material = new THREE.LineBasicMaterial({ color: 0x008060, depthTest: false });
+    group.add(new THREE.Line(geometry, material));
+    const topGeometry = new THREE.BufferGeometry().setFromPoints(corners.slice(0, 2));
+    const topMaterial = new THREE.LineBasicMaterial({ color: 0xff6600, depthTest: false });
+    group.add(new THREE.Line(topGeometry, topMaterial));
+    group.add(new THREE.ArrowHelper(display(normal), display(centre), side, 0x008060));
+    scene.add(group);
+    return () => {
+      scene.remove(group);
+      group.traverse((object: any) => { object.geometry?.dispose(); object.material?.dispose(); });
+    };
+  }, [markerForm, showMarkerForm, elements]);
+
   // Init project list
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
   useEffect(() => {
@@ -105,7 +165,8 @@ export default function ViewerPage() {
     if (!projectId) return;
     let cancelled = false;
     setIsLoading(true); setSelectedModel(null); setDefectsData(null);
-    setCameras([]); setMarkers([]); setBimModels([]);
+    setCameras([]); setMarkers([]); setBimModels([]); setElements([]);
+    setShowMarkerForm(false); setSelectedElementGuid(null);
     Promise.all([getBIMModels(projectId), getMappedDefects(projectId),
       getCameras(projectId), getMarkers(projectId)])
       .then(([bimData, defects, cameraData, markerData]) => {
@@ -376,6 +437,17 @@ export default function ViewerPage() {
       });
 
       scene.add(modelGroup);
+      const catalog = new Map<string, BIMElementOption>();
+      for (const mesh of modelGroup.children) {
+        const expressID = mesh.userData.expressID;
+        const line = ifcApi.GetLine(modelID, expressID);
+        if (line?.GlobalId?.value) {
+          const guid = line.GlobalId.value;
+          const typeName = ifcApi.GetNameFromTypeCode(line.type);
+          catalog.set(guid, { guid, expressID, label: `${line.Name?.value || typeName} · ${typeName} · ${guid}` });
+        }
+      }
+      setElements([...catalog.values()].sort((a, b) => a.label.localeCompare(b.label)));
 
       // Fit camera to model
       const box = new THREE.Box3().setFromObject(modelGroup);
@@ -392,6 +464,7 @@ export default function ViewerPage() {
 
       // Cleanup web-ifc model (keep API for future queries)
       fragmentsRef.current = { ifcApi, modelID };
+      loadedModelRef.current = model.id;
 
       setSelectedModel(model);
 
@@ -406,6 +479,13 @@ export default function ViewerPage() {
       setIsLoading(false);
     }
   }, [defectsData, updateDefectPins]);
+
+  useEffect(() => {
+    if (viewerReady && selectedModel && !isLoading && loadedModelRef.current !== selectedModel.id) {
+      loadedModelRef.current = selectedModel.id;
+      void loadIFCModel(selectedModel);
+    }
+  }, [viewerReady, selectedModel, isLoading, loadIFCModel]);
 
   // ── Raycast helper (shared by hover + click) ─────────────────────
   const raycastIFC = useCallback((e: React.MouseEvent) => {
@@ -539,6 +619,15 @@ export default function ViewerPage() {
     // Update selected element (always, for properties panel)
     setSelectedElementGuid(elementGuid);
     setSelectedElementProps(elementProps);
+    if (showMarkerForm) {
+      const { THREE } = componentsRef.current;
+      const normal = hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize();
+      setMarkerForm(previous => ({ ...previous,
+        world_x: String(worldPosition.x), world_y: String(worldPosition.y), world_z: String(worldPosition.z),
+        normal_x: String(normal.x), normal_y: String(-normal.z), normal_z: String(normal.y) }));
+      setActiveTab('markers');
+      return;
+    }
     setActiveTab('properties');
 
     // If in mapping mode, also map the defect
@@ -605,7 +694,7 @@ export default function ViewerPage() {
       outline.name = 'selection_outline';
       scene.add(outline);
     }
-  }, [raycastIFC, mappingDefectId, projectId, selectedModel?.id, defectsData, getElementProperties, updateDefectPins]);
+  }, [raycastIFC, mappingDefectId, projectId, selectedModel?.id, defectsData, getElementProperties, updateDefectPins, showMarkerForm]);
 
   // ── Upload IFC ────────────────────────────────────────────────────
   const handleUploadIFC = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -629,27 +718,41 @@ export default function ViewerPage() {
 
   // ── Add Camera ────────────────────────────────────────────────────
   const handleAddCamera = async () => {
-    if (!cameraForm.name || !cameraForm.rtsp_url || !projectId) return;
+    if (cameraSaving) return;
+    if (!cameraForm.name.trim() || !cameraForm.rtsp_url.trim() || !projectId || !selectedModel) {
+      setError('Select a model and enter the camera name and RTSP address.'); return;
+    }
+    const fov = Number(cameraForm.fov);
+    if (!(fov > 1 && fov < 179)) { setError('Enter the horizontal field of view from the camera specification (between 1° and 179°).'); return; }
+    if (!Number.isInteger(Number(inspectionInterval)) || Number(inspectionInterval) < 1 || Number(inspectionInterval) > 10080) {
+      setError('Enter an inspection interval between 1 and 10080 whole minutes.'); return;
+    }
+    if (startOnSave && !markers.some(marker => marker.bim_model_id === selectedModel.id)) {
+      setError('Register and install a marker for this BIM model before starting monitoring.'); return;
+    }
+    setCameraSaving(true); setError('');
     try {
       const camera = await createCamera({
-        name: cameraForm.name,
-        rtsp_url: cameraForm.rtsp_url,
-        project_id: projectId,
-        bim_model_id: selectedModel?.id,
-        bim_zone_label: cameraForm.zone_label || undefined,
-        location_description: cameraForm.location || undefined,
-        bim_element_guid: selectedElementGuid || undefined,
-
-        fov_horizontal_deg: cameraForm.fov ? Number(cameraForm.fov) : undefined,
-        auto_detect_enabled: false,
-        auto_detect_interval_minutes: 15,
+        name: cameraForm.name, rtsp_url: cameraForm.rtsp_url, project_id: projectId,
+        bim_model_id: selectedModel.id, fov_horizontal_deg: fov,
+        auto_detect_enabled: false, auto_detect_interval_minutes: Number(inspectionInterval),
       });
-      setCameras((prev) => [camera, ...prev]);
+      setCameras(previous => [camera, ...previous]);
       setShowCameraForm(false);
       setCameraForm({ name: '', rtsp_url: '', zone_label: '', location: '', fov: '' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add camera');
-    }
+      if (startOnSave) {
+        setMappingSuccess('Camera saved. Connecting and calibrating…');
+        try {
+          const updated = await api.post<Camera>(`/api/v1/cameras/${camera.id}/start-monitoring`);
+          setCameras(previous => previous.map(item => item.id === updated.id ? updated : item));
+          setMappingSuccess('Camera calibrated. First inspection queued; monitoring continues at the chosen interval.');
+        } catch (err) {
+          setMappingSuccess('');
+          setError(`Camera saved, but monitoring did not start: ${String(err)}. Use “Calibrate and start” on its card to retry.`);
+        }
+      } else setMappingSuccess('Camera saved. Use Preview to check the feed, then Calibrate and start.');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Failed to add camera'); }
+    finally { setCameraSaving(false); }
   };
 
   // ── Run Camera Detection ──────────────────────────────────────────
@@ -936,19 +1039,22 @@ export default function ViewerPage() {
                         value={cameraForm.rtsp_url}
                         onChange={(e) => setCameraForm({ ...cameraForm, rtsp_url: e.target.value })} />
                     </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: 11 }}>BIM Zone Label</label>
-                      <input className="input" placeholder="e.g. 3rd Floor East Wall" value={cameraForm.zone_label}
-                        onChange={(e) => setCameraForm({ ...cameraForm, zone_label: e.target.value })} />
-                    </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: 11 }}>Location Description</label>
-                      <input className="input" placeholder="Mounted on column C3" value={cameraForm.location}
-                        onChange={(e) => setCameraForm({ ...cameraForm, location: e.target.value })} />
-                    </div>
+                    <p>Model: {selectedModel?.original_filename || 'Select a BIM model first'}</p>
+                    <label>Horizontal field of view (degrees)
+                      <input className="input" type="number" min="2" max="178" placeholder="From the camera specification"
+                        value={cameraForm.fov} onChange={e => setCameraForm({ ...cameraForm, fov: e.target.value })} />
+                    </label>
+                    <p>FOV provides approximate lens calibration. Keep the camera fixed and verify alignment before relying on mapped positions.</p>
+                    <label>Inspection interval (minutes)
+                      <input className="input" type="number" min="1" max="10080" value={inspectionInterval}
+                        onChange={e => setInspectionInterval(e.target.value)} />
+                    </label>
+                    <label><input type="checkbox" checked={startOnSave} onChange={e => setStartOnSave(e.target.checked)} />
+                      Calibrate and start monitoring after saving</label>
+                    <p role="status">{monitoringAvailable ? 'Monitoring worker is online.' : 'Monitoring worker is offline. You can save a camera; monitoring needs the worker running.'}</p>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn btn-primary" onClick={handleAddCamera} style={{ flex: 1, fontSize: 12 }}>
-                        Save Camera
+                      <button className="btn btn-primary" onClick={handleAddCamera} disabled={cameraSaving} style={{ flex: 1, fontSize: 12 }}>
+                        {cameraSaving ? 'Setting up camera…' : startOnSave ? 'Save, calibrate and monitor' : 'Save camera'}
                       </button>
                       <button className="btn btn-secondary" onClick={() => setShowCameraForm(false)} style={{ fontSize: 12 }}>
                         Cancel
@@ -957,26 +1063,45 @@ export default function ViewerPage() {
                   </div>
                 )}
 
-                {cameras.map((cam) => (
+                {cameras.filter(cam => cam.bim_model_id === selectedModel?.id).map((cam) => (
                   <div key={cam.id} className={styles.cameraItem}>
                     <div className={styles.cameraHeader}>
                       <span className={styles.cameraName}><Wifi size={12} /> {cam.name}</span>
                       <span className={`${styles.cameraStatus} ${cam.is_active ? styles.cameraStatusActive : styles.cameraStatusInactive}`}>
-                        {cam.is_active ? 'Active' : 'Inactive'}
+                        {cam.status === 'error' ? 'Inspection failed' : cam.auto_detect_enabled ? (monitoringAvailable ? 'Monitoring enabled' : 'Worker offline') : 'Monitoring paused'}
                       </span>
                     </div>
                     {cam.bim_zone_label && (
                       <div className={styles.cameraZone}>📍 {cam.bim_zone_label}</div>
                     )}
                     <div className={styles.cameraMeta}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button className="btn btn-secondary" onClick={async () => {
+                          try {
+                            const response = await authenticatedFetch(`/api/v1/cameras/${cam.id}/preview`);
+                            if (!response.ok) throw new Error(await responseError(response));
+                            setCameraPreview(URL.createObjectURL(await response.blob()));
+                          } catch (err) { setError(String(err)); }
+                        }}>Preview feed</button>
+                        <button className="btn btn-secondary" disabled={cameraSaving} onClick={async () => {
+                          setCameraSaving(true);
+                          try {
+                            const updated = await api.post<Camera>(`/api/v1/cameras/${cam.id}/start-monitoring`);
+                            setCameras(previous => previous.map(item => item.id === updated.id ? updated : item));
+                            setMappingSuccess('Calibration complete. First inspection queued.');
+                          } catch (err) { setError(String(err)); }
+                          finally { setCameraSaving(false); }
+                        }}>{cameraSaving ? 'Connecting…' : 'Calibrate and start'}</button>
+                      </div>
                       {cam.total_defects_found} defects found
+                      {cam.calibrated_with_marker_id && <div>Reference marker: {markers.find(marker => marker.id === cam.calibrated_with_marker_id)?.marker_dict_id ?? 'Registered marker'}</div>}
                       {cam.last_detection_at && ` • Last: ${new Date(cam.last_detection_at).toLocaleDateString()}`}
                       {cam.auto_detect_enabled && ` • Auto: every ${cam.auto_detect_interval_minutes}min`}
                       {cam.calibration_status === 'calibrated' && <button className="btn btn-secondary" onClick={async () => {
                         try { const updated = await updateCamera(cam.id, { auto_detect_enabled: !cam.auto_detect_enabled });
                           setCameras(prev => prev.map(c => c.id === updated.id ? updated : c));
                         } catch (err) { setError(String(err)); }
-                      }}>{cam.auto_detect_enabled ? 'Disable schedule' : 'Enable 15-minute schedule'}</button>}
+                      }}>{cam.auto_detect_enabled ? 'Disable schedule' : 'Resume schedule'}</button>}
                     </div>
 
                     {/* Calibration Status */}
@@ -1018,7 +1143,7 @@ export default function ViewerPage() {
                             onClick={async () => {
                               try {
                                 const res = await calibrateCamera(cam.id, {
-                                  fov_horizontal_deg: parseFloat(calibrationFov) || 90,
+                                  fov_horizontal_deg: Number(calibrationFov),
                                 });
                                 if (res.success) {
                                   setError('');
@@ -1122,98 +1247,48 @@ export default function ViewerPage() {
                   <Plus size={14} /> Register Marker
                 </button>
 
-                {showMarkerForm && (
-                  <div style={{ marginBottom: 16, padding: 12, background: 'hsl(0,0%,10%)', borderRadius: 8, border: '1px solid hsl(0,0%,18%)' }}>
-                    <div style={{ fontSize: 11, color: 'hsl(0,0%,60%)', marginBottom: 8 }}>
-                      Register a printed ArUco marker at a known BIM coordinate.
-                      {registeringMarker && selectedElementGuid
-                        ? <> Click a point on the BIM model to set the 3D position, or enter manually.</>
-                        : <> Select an element in the 3D viewer first, then register.</>
+                {showMarkerForm && <MarkerPlacement values={markerForm} onChange={setMarkerForm}
+                  elements={elements} selectedGuid={selectedElementGuid} saving={markerSaving}
+                  onCancel={() => setShowMarkerForm(false)}
+                  onSelect={guid => {
+                    setSelectedElementGuid(guid || null);
+                    setMarkerForm(previous => ({ ...previous, world_x: '', world_y: '', world_z: '' }));
+                    const element = elements.find(item => item.guid === guid);
+                    if (element) {
+                      setSelectedElementProps(getElementProperties(element.expressID));
+                      const { THREE, scene, camera, controls } = componentsRef.current;
+                      const group = scene.getObjectByName('ifc_model');
+                      const mesh = group?.children.find((item: any) => item.userData.expressID === element.expressID);
+                      if (mesh) {
+                        const box = new THREE.Box3().setFromObject(mesh);
+                        const centre = box.getCenter(new THREE.Vector3());
+                        const distance = Math.max(box.getSize(new THREE.Vector3()).length(), 2);
+                        camera.position.copy(centre).add(new THREE.Vector3(distance, distance * .5, distance));
+                        controls.target.copy(centre); controls.update();
                       }
-                    </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: 11 }}>ArUco Marker ID</label>
-                      <input className="input" type="number" placeholder="0" min="0"
-                        value={markerForm.marker_dict_id}
-                        onChange={(e) => setMarkerForm({ ...markerForm, marker_dict_id: e.target.value })} />
-                    </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: 11 }}>Marker Size (metres)</label>
-                      <input className="input" type="number" step="0.01" placeholder="0.20"
-                        value={markerForm.physical_size_m}
-                        onChange={(e) => setMarkerForm({ ...markerForm, physical_size_m: e.target.value })} />
-                    </div>
-                    <div className="input-group">
-                      <label style={{ fontSize: 11 }}>Description</label>
-                      <input className="input" placeholder="e.g. Column A12, east face"
-                        value={markerForm.description}
-                        onChange={(e) => setMarkerForm({ ...markerForm, description: e.target.value })} />
-                    </div>
-
-                    {selectedElementGuid && selectedElementProps && (
-                      <div style={{ padding: 8, background: 'hsl(0,0%,8%)', borderRadius: 6, fontSize: 11, marginBottom: 8 }}>
-                        <div style={{ color: '#2d8a5e', marginBottom: 4 }}>
-                          <CheckCircle2 size={11} style={{ display: 'inline' }} /> BIM Element Selected
-                        </div>
-                        <div style={{ color: 'hsl(0,0%,50%)' }}>
-                          GUID: {selectedElementGuid.substring(0, 16)}...
-                        </div>
-                      </div>
-                    )}
-
-                    <p style={{ fontSize: 12 }}>Enter the surveyed marker centre in IFC world coordinates (metres), its outward surface normal, and printed-marker rotation. At least two registered markers must be visible during calibration.</p>
-                    {(['world_x', 'world_y', 'world_z', 'normal_x', 'normal_y', 'normal_z', 'rotation_deg'] as const).map(field => (
-                      <label key={field} style={{ display: 'block', marginBottom: 8 }}>
-                        {field.replaceAll('_', ' ')}
-                        <input className="input" type="number" step="any" required value={markerForm[field]}
-                          onChange={e => setMarkerForm({ ...markerForm, [field]: e.target.value })} />
-                      </label>
-                    ))}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        className="btn btn-primary"
-                        style={{ flex: 1, fontSize: 12 }}
-                        onClick={async () => {
-                          if (!projectId) return;
-                          try {
-                            if ([markerForm.world_x, markerForm.world_y, markerForm.world_z].some(v => !v.trim() || !Number.isFinite(Number(v)))) {
-                              throw new Error('Enter surveyed marker coordinates in BIM metres.');
-                            }
-                            const m = await createMarker({
-                              project_id: projectId,
-                              marker_dict_id: parseInt(markerForm.marker_dict_id) || 0,
-                              physical_size_m: parseFloat(markerForm.physical_size_m) || 0.20,
-                              bim_model_id: selectedModel?.id,
-                              bim_element_guid: selectedElementGuid || undefined,
-                              bim_point_description: markerForm.description || undefined,
-                              world_x: Number(markerForm.world_x),
-                              world_y: Number(markerForm.world_y),
-                              world_z: Number(markerForm.world_z),
-                              normal_x: Number(markerForm.normal_x),
-                              normal_y: Number(markerForm.normal_y),
-                              normal_z: Number(markerForm.normal_z),
-                              rotation_deg: Number(markerForm.rotation_deg),
-                            });
-                            setMarkers((prev) => [m, ...prev]);
-                            setShowMarkerForm(false);
-                            setMarkerForm({ marker_dict_id: '0', physical_size_m: '0.20', description: '', world_x: '', world_y: '', world_z: '', normal_x: '0', normal_y: '0', normal_z: '1', rotation_deg: '0' });
-                          } catch (err) {
-                            setError(err instanceof Error ? err.message : 'Failed to register marker');
-                          }
-                        }}
-                      >
-                        Save Marker
-                      </button>
-                      <button className="btn btn-secondary" style={{ fontSize: 12 }}
-                        onClick={() => setShowMarkerForm(false)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                    }
+                  }}
+                  onSave={async dictionary => {
+                    if (!selectedModel || !selectedElementGuid) { setError('Select a BIM model and element.'); return; }
+                    setMarkerSaving(true);
+                    try {
+                      const marker = await createMarker({
+                        project_id: projectId, bim_model_id: selectedModel.id, bim_element_guid: selectedElementGuid,
+                        aruco_dict_type: dictionary, physical_size_m: Number(markerForm.physical_size_m),
+                        bim_point_description: markerForm.description,
+                        world_x: Number(markerForm.world_x), world_y: Number(markerForm.world_y), world_z: Number(markerForm.world_z),
+                        normal_x: Number(markerForm.normal_x), normal_y: Number(markerForm.normal_y), normal_z: Number(markerForm.normal_z),
+                        rotation_deg: Number(markerForm.rotation_deg),
+                      });
+                      setMarkers(previous => [marker, ...previous]); setShowMarkerForm(false);
+                      setMappingSuccess(`Marker ${marker.marker_dict_id} saved. Download its print and install it at the selected position.`);
+                      setError('');
+                    } catch (err) { setError(String(err)); }
+                    finally { setMarkerSaving(false); }
+                  }} />}
 
                 {markers.length > 0 ? (
-                  markers.map((m) => (
+                  markers.filter(m => m.bim_model_id === selectedModel?.id).map((m) => (
                     <div key={m.id} className={styles.cameraItem}>
                       <div className={styles.cameraHeader}>
                         <span className={styles.cameraName}>
@@ -1236,11 +1311,26 @@ export default function ViewerPage() {
                         </div>
                       )}
                       <div className={styles.cameraActions}>
+                        <button className={styles.cameraBtn} onClick={async () => {
+                          try {
+                            const response = await authenticatedFetch(`/api/v1/markers/${m.id}/print`);
+                            if (!response.ok) throw new Error(await responseError(response));
+                            const url = URL.createObjectURL(await response.blob());
+                            const link = document.createElement('a'); link.href = url;
+                            link.download = `marker-${m.marker_dict_id}.svg`; link.click();
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                          } catch (err) { setError(String(err)); }
+                        }}>Download print</button>
                         <button
                           className={`${styles.cameraBtn} ${styles.cameraBtnDanger}`}
                           onClick={async () => {
-                            await deleteMarker(m.id);
-                            setMarkers((prev) => prev.filter((mk) => mk.id !== m.id));
+                            if (!window.confirm('Remove this marker registration? Remove the physical print too. Cameras in this project will need recalibration.')) return;
+                            try {
+                              await deleteMarker(m.id);
+                              setMarkers((prev) => prev.filter((mk) => mk.id !== m.id));
+                              const cameraData = await getCameras(projectId);
+                              setCameras(cameraData.cameras);
+                            } catch (err) { setError(String(err)); }
                           }}
                         >
                           <Trash2 size={12} /> Remove
@@ -1257,6 +1347,11 @@ export default function ViewerPage() {
                 )}
               </>
             )}
+
+            {cameraPreview && <div role="dialog" aria-label="Camera preview" style={{ padding: 12 }}>
+              <button className="btn btn-secondary" onClick={() => setCameraPreview(null)}>Close preview</button>
+              <img src={cameraPreview} alt="Latest frame from the selected camera" style={{ width: '100%' }} />
+            </div>}
 
             {/* ── Properties Tab ──────────────────────────── */}
             {activeTab === 'properties' && (
