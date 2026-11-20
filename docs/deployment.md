@@ -24,7 +24,7 @@ Build with `docker compose -f compose.production.yml build`. Review the image an
 
 ## Cameras and calibration
 
-Register at least two visible markers against the same BIM model. Enter surveyed IFC-world coordinates in metres, surface normals, and printed-marker rotation. The default local marker basis is constructed in `pose_solver.transform_object_points_to_world`; rotation is around the outward normal. Use measured lens intrinsics/distortion for quantitative work. FOV-derived intrinsics are approximate. Verify independent surveyed checkpoints across the entire image, not only marker reprojection error.
+Register one or more visible markers against the same BIM model. Enter surveyed IFC-world coordinates in metres, surface normals, and printed-marker rotation. The default local marker basis is constructed in `pose_solver.transform_object_points_to_world`; rotation is around the outward normal. Use measured lens intrinsics/distortion for quantitative work. FOV-derived intrinsics are approximate. Verify independent surveyed checkpoints across the entire image, not only marker reprojection error.
 
 Calibration rejects fits above two pixels and insufficient marker evidence. Source/model/FOV/resolution changes invalidate calibration and disable scheduling. A scheduled worker must actually be running; enabling a camera flag alone does not start a process. The worker uses persisted claims, retries on the configured interval, and records failure status. It performs finite inspection batches, not a low-latency continuous stream. Confirm reconnection, movement, stale-frame, multiple-camera, and prolonged outage behavior on actual hardware.
 

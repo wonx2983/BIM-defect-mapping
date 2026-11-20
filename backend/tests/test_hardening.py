@@ -47,7 +47,10 @@ def test_actual_calibrator_uses_all_markers_and_rejects_insufficient_evidence():
     assert result.success
     assert result.pnp_result.reprojection_error < 1
     assert np.linalg.norm(result.pnp_result.camera_position_world - scene.GT_CAMERA_POS) < .2
-    assert not calibrate_camera_from_frame(frame, registry[:1], intrinsics=intrinsics).success
+    single = calibrate_camera_from_frame(frame, registry[:1], intrinsics=intrinsics)
+    assert single.success
+    assert np.linalg.norm(single.pnp_result.camera_position_world - scene.GT_CAMERA_POS) < 1.0
+    assert not calibrate_camera_from_frame(frame, [], intrinsics=intrinsics).success
 
 
 def test_calibration_rejects_high_reprojection(monkeypatch):

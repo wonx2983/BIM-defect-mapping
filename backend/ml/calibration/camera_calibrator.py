@@ -111,10 +111,10 @@ def calibrate_camera_from_frame(
 
     matches = [(det, registry_by_id[det.marker_id]) for det in detected
                if det.marker_id in registry_by_id]
-    if len(matches) < 2:
+    if not matches:
         return CalibrationResult(success=False, intrinsics=intrinsics,
             image_width=w, image_height=h,
-            error_message="At least two registered markers must be visible for reliable calibration.")
+            error_message="At least one registered marker must be visible for calibration.")
     matched_marker, matched_registry = matches[0]
     image_points, world_points = [], []
     for marker, entry in matches:
@@ -126,7 +126,7 @@ def calibrate_camera_from_frame(
             entry.get("rotation_deg", 0),
         ))
     pnp_result = solve_pnp(np.vstack(image_points), np.vstack(world_points),
-                           intrinsics, use_ransac=True)
+                           intrinsics, use_ransac=len(matches) > 1)
 
     if not pnp_result.success:
         return CalibrationResult(
