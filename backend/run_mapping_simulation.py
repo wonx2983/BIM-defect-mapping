@@ -208,8 +208,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ifc", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--crack-count", type=int, choices=range(1, 6),
-                        help="Use the first N eligible cracks in the fixed scene order")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--crack-count", type=int, choices=range(1, 6),
+                           help="Use the first N eligible cracks in the fixed scene order")
+    selection.add_argument("--crack-ids", nargs="+", choices=[f"C{i}" for i in range(1, 6)],
+                           help="Render only these IDs from the original scene")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("YOLO_CONFIG_DIR", str((args.out / ".ultralytics").resolve()))
@@ -246,6 +249,8 @@ def main():
     positive = clean.copy()
     occupied = cv2.dilate(marker_mask, np.ones((55, 55), np.uint8)).astype(bool)
     truth = []
+    scene_index = 0
+    selected_ids = set(args.crack_ids or [])
     for family in ("IfcWall", "IfcSlab", "IfcColumn", "IfcWall", "IfcWall"):
         choices = []
         for owner in np.unique(owner_image):
@@ -257,20 +262,26 @@ def main():
         if not choices:
             continue
         radius, owner, pixel = max(choices)
-        box = draw_crack(positive, pixel, 58 + len(truth), radius)
+        scene_index += 1
+        crack_id = f"C{scene_index}"
+        cv2.circle(occupied.view(np.uint8), pixel, max(56, int(radius)), 1, -1)
+        if selected_ids and crack_id not in selected_ids:
+            continue
+        box = draw_crack(positive, pixel, 57 + scene_index, radius)
         x, y = map(lambda value: int(round(value)), centre(box))
         if owner_image[y, x] != owner:
             raise RuntimeError("Crack centre crossed a BIM element boundary")
-        truth.append(dict(id=f"C{len(truth) + 1}", box=box, element_guid=guids[owner],
+        truth.append(dict(id=crack_id, box=box, element_guid=guids[owner],
                           element_type=types[owner], element_name=elements[owner].Name,
                           pixel=[x, y], world=surface_point((x, y), depth, position, rotation, intrinsics).tolist()))
-        cv2.circle(occupied.view(np.uint8), pixel, max(56, int(radius)), 1, -1)
         if len(truth) == args.crack_count:
             break
     if not truth:
         raise RuntimeError("No suitable surfaces for test cracks")
     if args.crack_count is not None and len(truth) != args.crack_count:
         raise RuntimeError(f"Placed {len(truth)} of {args.crack_count} requested cracks")
+    if selected_ids and {row["id"] for row in truth} != selected_ids:
+        raise RuntimeError("Requested crack IDs are unavailable in this scene")
 
     cal = calibrate_camera_from_frame(positive, [registry], fov_horizontal_deg=FOV, ifc_path=args.ifc)
     no_marker = calibrate_camera_from_frame(frame, [registry], fov_horizontal_deg=FOV, ifc_path=args.ifc)

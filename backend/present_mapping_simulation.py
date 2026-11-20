@@ -24,6 +24,13 @@ def report(out):
     error_summary = f"{mean(errors):.2f} cm mean and {max(errors):.2f} cm maximum" if errors else "No hits"
     matched_predictions = [row for row in predictions if row.get("matches")]
     end_to_end = sum(row["correct_element"] is True for row in matched_predictions)
+    crack_ids = [row["id"] for row in mapping]
+    selected_subset = crack_ids != [f"C{i}" for i in range(1, len(mapping) + 1)]
+    selection_note = (
+        f"Reference cracks in this demonstration: {', '.join(crack_ids)}. "
+        "Two detections in one selected scene do not establish general detection accuracy."
+        if selected_subset else ""
+    )
     reprojection = evidence["reprojection_error_px"]
     calibration = (
         f"ID {evidence['marker']['marker_dict_id']} decoded. Reprojection error {reprojection:.3f} px. "
@@ -33,7 +40,10 @@ def report(out):
     pages = [
         ("Virtual camera and IFC", "01-virtual-camera.png",
          f"A fixed virtual camera renders the Schependomlaan IFC with one ArUco marker and {len(mapping)} rendered cracks.",
-         "The renderer records the exact surface GUID and 3D position behind each labelled crack."),
+         (f"Selected reference cracks: {', '.join(crack_ids)}. "
+          "The renderer records each crack's IFC element and 3D position."
+          if selected_subset else
+          "The renderer records the exact surface GUID and 3D position behind each labelled crack.")),
         ("Part 1 | Detection ground truth", "03-ground-truth.png",
          "Blue boxes are the known crack annotations. These labels are held out from the detector.",
          "Run the bundled YOLO checkpoint at confidence 0.25. Score class-correct matches at IoU 0.50."),
@@ -113,6 +123,7 @@ def report(out):
     table{{margin-top:18px;width:100%;border-collapse:collapse;font-size:.87em}}
     td,th{{text-align:left;padding:8px;border-bottom:1px solid #dce4e8}} a{{color:#085e83}}
     </style><main><h1>DefectSync simulation record</h1>{summary.rstrip()}
+    {f'<p>{escape(selection_note)}</p>' if selection_note else ''}
     <p><a href="results.json">Raw results and provenance</a> · <a href="mapping.csv">Mapping measurements CSV</a> ·
     <a href="07-no-marker-control.png">Missing-marker input</a> · <a href="execution.txt">Execution log</a></p>
     <video controls preload="metadata" src="simulation.mp4"></video>{sections}{methodology}</main></html>""", encoding="utf-8")

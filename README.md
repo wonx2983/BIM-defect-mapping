@@ -1,5 +1,71 @@
 # Automation of Mapping Quality Defects in BIM Environment (DefectSync)
+# DefectSync: Mapping Concrete Defects to BIM
 
+DefectSync is a B.Tech project that connects visual inspections to a building information model. A detector finds suspected defects in images or sampled video frames. A separate spatial mapper uses a calibrated camera and IFC geometry to place observations on the model.
+
+- **Project report:** [Detection, BIM mapping, and the user workflow (PDF)](docs/DefectSync-project-report.pdf)
+- **Recorded demonstration:** [Simulation evidence](runs/bim-simulation/README.md) · [56-second walkthrough](runs/bim-simulation/simulation.mp4)
+- **Deployment and testing:** [Deployment and acceptance guide](docs/deployment.md)
+
+## Two student contributions
+
+| Part | Scope | Output |
+| --- | --- | --- |
+| **Student 1: Defect detection** | Image and frame handling, YOLO inference, confidence and severity estimates, annotated inspection evidence, and detection evaluation. | Class, confidence, bounding box in the original image, dimensions in pixels, and source evidence. |
+| **Student 2: BIM mapping** | IFC viewer and geometry, marker placement, camera calibration, pixel-to-ray projection, element assignment, and mapped inspection workflow. | IFC model and element GUID, 3D hit location, mapping status, and a pin the inspector can review. |
+
+The handoff is the detection box centre in original image pixels plus the identity of the source camera and frame. The mapper requires the pose, intrinsics, and IFC model for that camera. It can also be tested independently with known reference pixels.
+
+## User workflow
+
+1. Sign in, create or open a project, and upload the correct IFC version in the **BIM Viewer**.
+2. For an ad hoc inspection, open **Detection** to upload a photo or **Video** to process sampled frames. Review the boxes, classes, and confidence scores. Calibration is needed for automatic spatial assignment.
+3. For automated BIM mapping, open **Markers** in the viewer. Search for the IFC element, select the face at the marker centre, and check the facing direction and orientation. Save to assign an ArUco ID. Print the pattern at actual size, measure its black square, and mount it at the registered position.
+4. Open **Cameras** and register an authorized RTSP source with its horizontal field of view and inspection interval. One visible registered marker can calibrate a fixed camera. Preview the frame and retry calibration if needed. With the scheduler online, a calibrated camera can start periodic inspections without a second registration.
+5. Review mapped pins and unresolved observations. Verify the element and original evidence, update the record, and export the inspection list as CSV.
+
+## How it works
+
+- **Detection:** The bundled YOLOv11 checkpoint recognizes crack, spalling, exposed rebar, corrosion, efflorescence, scaling, and honeycombing. The confidence threshold filters boxes. Severity is an estimate; image measurements are in pixels unless a valid physical measurement method is supplied.
+- **Calibration:** The registry identifies a printed pattern by dictionary and ID. OpenCV matches observed pixel corners to the known 3D square, estimates the camera pose with PnP, and checks reprojection error. A moved camera or changed lens/stream parameters needs recalibration.
+- **Mapping:** The mapper back-projects the detection box centre into a world ray. IfcOpenShell provides world-space meshes, frustum culling narrows the candidates, and ray-triangle intersection selects the nearest surface hit. The result records the IFC GlobalId and 3D hit point in metres. Observations of the same class near one another on the same element can be merged.
+- **System:** Next.js and Three.js/web-ifc provide the UI. FastAPI serves inspections and geometry metadata. PostgreSQL stores project, calibration and defect records. Authorized local storage holds IFC and evidence. A standalone worker runs scheduled inspection batches.
+
+## Schependomlaan simulation
+
+The recorded demonstration used the Schependomlaan IFC, a fixed 1280 × 720 virtual camera, one registered ArUco marker, and **two simulated cracks**. The detector used a 0.25 confidence threshold and class-correct matches at intersection over union (IoU) of at least 0.50.
+
+| Test | Recorded result |
+| --- | --- |
+| Detection | **2 of 2 simulated cracks detected**, with two false alerts on the crack frame and three on the clean control. |
+| BIM mapping by itself | Both reference pixels mapped to the correct IFC walls. Mean 3D position error was **4.35 cm**. |
+| Detection to BIM | Both matched YOLO boxes mapped to the correct walls. Position errors were **11.35 cm** and **10.36 cm**. |
+| Calibration control | The registered marker was decoded and the marker-free frame was rejected. |
+
+This selected demonstration shows the pipeline working in one controlled scene. Detecting both examples does not establish 100% accuracy or predict performance on real sites. The [raw measurements](runs/bim-simulation/results.json) preserve the evidence.
+
+## Run locally
+
+Prerequisites: Python 3.11, Node.js 22.13+, npm, and PostgreSQL. Copy the root `.env.example` to `.env` and configure the database connections and JWT signing secret. Configure the approved camera hosts for RTSP use. Keep the populated file local.
+
+From `backend`, activate a Python virtual environment, then run:
+
+```bash
+python -m pip install -r requirements.txt
+alembic upgrade head
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+From `frontend`, in another terminal:
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the [local dashboard](http://localhost:3000), [BIM Viewer](http://localhost:3000/viewer), or [API documentation](http://localhost:8000/docs). Check [backend readiness](http://localhost:8000/ready). For scheduled camera inspections, also run `python -m app.services.scheduler` from the backend environment with `SCHEDULER_ENABLED=true`.
+
+Install `backend/requirements-dev.txt` to run the backend tests from `backend` (`python -m pytest tests -q`). From `frontend`, run `npm run lint`, `npm run typecheck`, and `npm run build`. To reproduce the virtual-camera walkthrough, see the [simulation instructions](runs/bim-simulation/README.md).
 An inspection platform under active field validation for real-time concrete defect detection, severity assessment, and automated 3D BIM spatial mapping — built for construction professionals, site engineers, and quality assurance managers.
 
 The [recorded Schependomlaan simulation](runs/bim-simulation/README.md) includes the virtual camera frames, detection and mapping scores, and a short walkthrough.

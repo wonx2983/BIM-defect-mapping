@@ -4,5 +4,5 @@ Creating new Ultralytics Settings v0.0.6 file ✅
 View Ultralytics Settings with 'yolo settings' or in the run directory settings file.
 Update Settings with 'yolo settings key=value', i.e. 'yolo settings runs_dir=path/to/dir'. For help see https://docs.ultralytics.com/quickstart/#ultralytics-settings.
 Running YOLO on positive and clean-control frames
-Mapping 2 known defect locations and 1 YOLO outputs
-Completed. Calibration=True; mapped correct=2/2; YOLO matched=0/2
+Mapping 2 known defect locations and 4 YOLO outputs
+Completed. Calibration=True; mapped correct=2/2; YOLO matched=2/2
