@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   skipTrailingSlashRedirect: true,
+  experimental: {
+    // Allow 500 MiB video uploads plus multipart headers through API rewrites.
+    middlewareClientMaxBodySize: '501mb',
+  },
   async rewrites() {
     const backend = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8000';
     return [

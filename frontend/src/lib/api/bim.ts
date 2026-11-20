@@ -1,5 +1,5 @@
 
-import { authenticatedFetch } from '@/lib/api';
+import { authenticatedFetch, responseError } from '@/lib/api';
 import { api } from '@/lib/api';
 
 export interface BIMModel {
@@ -51,6 +51,9 @@ export async function getBIMModels(projectId: string): Promise<{ models: BIMMode
 }
 
 export async function uploadBIMModel(projectId: string, file: File): Promise<BIMModel> {
+  if (file.size > 100 * 1024 * 1024) {
+    throw new Error('IFC files must be 100 MiB or smaller.');
+  }
   const formData = new FormData();
   formData.append('file', file);
   formData.append('project_id', projectId);
@@ -62,8 +65,7 @@ export async function uploadBIMModel(projectId: string, file: File): Promise<BIM
     body: formData,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    throw new Error(await responseError(res));
   }
   return res.json();
 }
