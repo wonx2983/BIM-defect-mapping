@@ -3,7 +3,7 @@
 
 DefectSync is a B.Tech project that connects visual inspections to a building information model. A detector finds suspected defects in images or sampled video frames. A separate spatial mapper uses a calibrated camera and IFC geometry to place observations on the model.
 
-- **Project report:** [Detection, BIM mapping, and the user workflow (PDF)](docs/DefectSync-project-report.pdf)
+- **Full technical report:** [Both student contributions, algorithms, novelty, and the inspection workflow (PDF)](docs/DefectSync-project-report.pdf)
 - **Recorded demonstration:** [Simulation evidence](runs/bim-simulation/README.md) · [56-second walkthrough](runs/bim-simulation/simulation.mp4)
 - **Deployment and testing:** [Deployment and acceptance guide](docs/deployment.md)
 

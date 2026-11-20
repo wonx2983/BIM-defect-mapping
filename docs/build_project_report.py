@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.graphics.shapes import Circle, Drawing, Line, Rect, String
 from reportlab.platypus import Image, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +86,46 @@ def link(label, path):
     return f'<a color="#087C78" href="{REPO}/blob/main/{path}">{escape(label)}</a>'
 
 
+def external(label, url):
+    return f'<a color="#087C78" href="{url}">{escape(label)}</a>'
+
+
+def connection_diagram():
+    drawing = Drawing(WIDTH, 135)
+    captions = [
+        ("CAPTURE", "Image / sampled frame"),
+        ("DETECT", "Class + original box"),
+        ("MAP", "IFC GlobalId + XYZ"),
+        ("REVIEW", "Pin + evidence"),
+    ]
+    for index, (heading, detail) in enumerate(captions):
+        x = 4 + 124 * index
+        drawing.add(Rect(x, 44, 113, 51, rx=6, ry=6, fillColor=PALE, strokeColor=RULE))
+        drawing.add(String(x + 10, 77, heading, fontName="Helvetica-Bold", fontSize=9, fillColor=TEAL))
+        drawing.add(String(x + 10, 59, detail, fontSize=8, fillColor=TEXT))
+        if index:
+            drawing.add(Line(x - 11, 69, x, 69, strokeColor=TEAL))
+    drawing.add(String(8, 108, "Inspection pipeline", fontName="Helvetica-Bold", fontSize=10, fillColor=NAVY))
+    drawing.add(String(8, 20, "Calibration and the linked IFC model supply the geometry used in MAP.", fontSize=9, fillColor=MUTED))
+    return drawing
+
+
+def ray_diagram():
+    drawing = Drawing(WIDTH, 184)
+    drawing.add(Rect(0, 0, WIDTH, 184, rx=6, ry=6, fillColor=PALE, strokeColor=RULE))
+    drawing.add(Line(55, 46, 428, 141, strokeColor=TEAL, strokeWidth=2))
+    drawing.add(Line(122, 40, 122, 126, strokeColor=MUTED, strokeWidth=2))
+    drawing.add(Line(278, 58, 278, 139, strokeColor=NAVY, strokeWidth=4))
+    drawing.add(Line(391, 81, 391, 156, strokeColor=MUTED, strokeWidth=3))
+    for x, y in [(55,46), (122,63), (278,103), (391,132)]:
+        drawing.add(Circle(x, y, 4, fillColor=TEAL, strokeColor=colors.white))
+    for x, y, label in [(26, 26, "Camera C"), (91, 138, "Image plane"),
+                        (132, 53, "Pixel (u, v)"), (228, 149, "Wall A: first hit"),
+                        (349, 167, "Wall B: farther hit"), (166, 101, "World ray")]:
+        drawing.add(String(x, y, label, fontSize=9, fillColor=NAVY))
+    return drawing
+
+
 def shell(canvas, doc):
     w, h = A4
     canvas.saveState()
@@ -113,24 +154,28 @@ def build():
     assert len(known) == 2 and matched == 2 and result["calibration_passed"], "Expected verified two-crack demo"
     story = []
 
-    page(story, "PROJECT REPORT  /  NOVEMBER 2026", "DefectSync",
-         "From concrete defect detection to location in a building information model.", first=True)
-    story.append(figure("01-virtual-camera.png",
-                        "Figure 1. Current Schependomlaan virtual camera frame. Two simulated wall cracks and one virtual ArUco marker are present."))
+    page(story, "INDIAN INSTITUTE OF TECHNOLOGY DELHI  /  NOVEMBER 2026", "DefectSync",
+         "Technical report on AI-driven concrete inspection and automated defect-to-BIM mapping.", first=True)
+    block(story, "B.Tech project",
+          "Department of Civil Engineering, Indian Institute of Technology Delhi<br/>"
+          "<b>Project supervisor:</b> Prof. Sahil Garg")
+    story.append(connection_diagram())
     story.append(table(["Contribution", "Responsibility and result"], [
-        ("<b>Part I | Student 1</b><br/>Defect detection",
+        ("<b>Part I</b><br/>Bhavishya Kumar Singh",
          "Find suspected defects in images or sampled video frames. Produce class, confidence, bounding boxes, size in pixels, and annotated evidence."),
-        ("<b>Part II | Student 2</b><br/>BIM mapping",
+        ("<b>Part II</b><br/>Krishan Jangir",
          "Register IFC geometry and cameras, recover camera pose from a marker, and locate the defect on a specific IFC element in 3D."),
     ], [.34, .66]))
     story.append(Spacer(1, 14))
-    block(story, "Demonstration outcome",
-          f"Two cracks were simulated and both were detected. Both matched detections mapped to the expected IFC walls. "
-          f"The crack frame also generated {false_positive} false alerts and the clean control generated {clean_count}. "
-          "This is a selected software demonstration from one viewpoint. It does not establish 100% accuracy or field readiness.")
+    block(story, "Reading guide",
+          "<b>Pages 2-7.</b> System overview, followed by Part I: detection, data, training, severity and video.<br/>"
+          "<b>Pages 8-11.</b> Part II: IFC viewer, camera registration, coordinate transforms and raycasting.<br/>"
+          "<b>Pages 12-16.</b> Shared user journey, software stack, validation and references.")
 
     page(story, "SYSTEM OVERVIEW", "From inspection to IFC element",
          "The detector answers what and where in the image. The mapper answers which model element and where in 3D.")
+    block(story, "Problem and design objective",
+          "A photograph can reveal a suspected surface defect before the surface is covered, but a pixel or a camera name does not identify the affected wall, column or slab. One camera may see several elements. DefectSync joins image-based observations to a persistent building element and source evidence so an inspector can review and track it.")
     story.append(table(["Step", "System responsibility", "Handed to the next step"], [
         ("1. Capture", "Upload an image or video, or capture a bounded batch from a configured RTSP camera.",
          "Image/frame, source identity and evidence."),
@@ -150,7 +195,7 @@ def build():
     block(story, "The interface between student contributions",
           "The mapper uses the bounding-box centre <b>(u, v)</b> in original-frame pixels. The source camera and frame resolution tie that pixel to the calibrated intrinsics and pose. Class, confidence and reference to the source evidence are carried through. A pixel from a different crop or resolution must first be translated to the calibrated image coordinates.")
 
-    page(story, "PART I  /  STUDENT 1", "Detecting defects in images",
+    page(story, "PART I  /  BHAVISHYA KUMAR SINGH", "Detecting defects in images",
          "This contribution turns camera observations into structured, reviewable detections.")
     block(story, "1. Acquire and validate the input",
           "Detection accepts image uploads. Video processing samples selected frames from an uploaded clip, and the camera workflow samples frames from an authorized RTSP source. Inputs are decoded before inference. The image upload path corrects EXIF orientation and converts to RGB. Size, frame count and stream time limits bound the cost of an inspection.",
@@ -168,25 +213,75 @@ def build():
         ("Missed defect", "The defect is too small, blurred, obstructed, or looks different from the training examples.", "Acquire closer or better-lit evidence and inspect manually."),
     ], [.20, .40, .40]))
 
-    page(story, "PART I  /  DETECTION EVALUATION", "What the detector found",
-         "Evaluation compares the detector's actual boxes with independently defined reference boxes.")
-    story.append(figure("04-yolo-positive.png",
-                        "Figure 2. Actual detector output for the current two-crack frame. The two crack boxes match C3 and C4. The other boxes are false alerts."))
-    block(story, "Matching rule",
-          "Match a prediction to one unused reference box of the same class. Intersection over union (IoU) is the overlap area divided by the union area. This run uses IoU at least 0.50, with predictions evaluated in descending confidence order.")
-    story.append(table(["Observation", "Confidence", "IoU / outcome"], [
-        (crack, f"{prediction['confidence']:.3f}",
-         f"{prediction['best_unmatched_iou']:.3f} / matched crack")
-        for crack, prediction in detected.items()
-    ] + [
-        ("Other boxes on the crack frame", "At least 0.25", f"{false_positive} unmatched predictions"),
-        ("Clean control", "At least 0.25", f"{clean_count} false alerts"),
-    ], [.47, .19, .34]))
-    story.append(Spacer(1, 10))
-    block(story, "How to interpret the outcome",
-          "Both reference cracks were detected in this chosen frame. The false alerts show why the result is not an accuracy claim. A general evaluation needs annotated independent site data, multiple classes and conditions, negative scenes, and metrics such as precision, recall and average precision.")
+    page(story, "PART I  /  BHAVISHYA KUMAR SINGH", "Dataset and model training",
+         "A shared taxonomy lets the detector learn several defect types and emit a stable class ID for the rest of the system.")
+    block(story, "Dataset curation",
+          "The repository's preparation tool targets two Roboflow sources: DEEP Concrete Defect Detection and a honeycombing dataset. It translates names and indices into a single taxonomy and writes train, validation and test locations in YOLO format. The raw datasets are not bundled, so the exact retained counts and split independence are not independently verified here.",
+          "Each annotation carries a class index and a normalized box centre, width and height. The unified labels make predictions across sources comparable. Before a field benchmark, verify for each class that site, capture session and near-duplicate images do not cross the training and evaluation splits. Retain verified normal surfaces to measure false alarms.")
+    story.append(table(["Class", "Surface cue used in review", "Severity base"], [
+        ("Crack", "Linear, branched or network-like discontinuity", "0.60"),
+        ("Spalling", "Detached or missing concrete cover", "0.70"),
+        ("Exposed rebar", "Reinforcing steel visible through cover loss", "0.90"),
+        ("Corrosion", "Rust-related surface staining or exposed steel oxidation", "0.85"),
+        ("Efflorescence", "Pale mineral or salt deposits", "0.50"),
+        ("Scaling", "Flaking or peeling of the surface layer", "0.65"),
+        ("Honeycombing", "Voids and exposed coarse aggregate from incomplete consolidation", "0.75"),
+    ], [.22, .60, .18]))
+    story.append(Spacer(1, 13))
+    block(story, "Transfer learning and checkpointing",
+          "The training script fine-tunes a YOLO11 checkpoint with configurable image size, batch and epoch count. The default arguments use 640-pixel training images and 50 epochs. Colour, perspective, rotation, scale, flips, mosaic and mixup augment the training set. Run state supports checkpoint resumption. The script can copy best weights into the model directory and optionally export ONNX. The delivered FastAPI inference path uses the PyTorch checkpoint.")
 
-    page(story, "PART II  /  STUDENT 2", "Registering a camera in BIM",
+    page(story, "PART I  /  BHAVISHYA KUMAR SINGH", "Severity as a review aid",
+         "The software gives each candidate a consistent review priority and retains the evidence behind it.")
+    block(story, "Classifier path",
+          "The optional ResNet-18 path uses transfer learning on labelled defect crops. It crops the YOLO box, resizes to 224 x 224 and applies normalization. Softmax gives a class distribution. A weighted sum of the probability for each band gives a continuous score using midpoints 0.125, 0.375, 0.625 and 0.875. The training code provides class weighting, AdamW and a cosine schedule for this pathway.",
+          "This release does not bundle a trained severity checkpoint. The runtime therefore uses the rule path. A deployed classifier would need provenance, verified label order and independent expert-labelled grading data.")
+    block(story, "Rule path used in the current application",
+          "The rule starts with the base weight of the predicted defect class and combines it with four quantities derived from the box and detector output. Scores are bounded to [0, 1].")
+    story.append(table(["Factor", "Weight", "What it measures"], [
+        ("Class", "25%", "Fixed importance weight for the predicted defect type."),
+        ("Relative box area", "25%", "Box area divided by image area, scaled and capped."),
+        ("Detection confidence", "20%", "Prominence proxy from the detector output."),
+        ("Aspect ratio", "15%", "Elongation of the detected rectangle, scaled and capped."),
+        ("Image-edge proximity", "15%", "Distance to the nearest image boundary, not a verified structural joint."),
+    ], [.25, .16, .59]))
+    story.append(Spacer(1, 12))
+    block(story, "Score interpretation",
+          "Low, Medium, High and Critical are bands separated by 0.25, 0.50 and 0.75. Framing, distance and cropping can change the image-derived factors even for the same defect. The score and pixel dimensions help order a review queue. Engineering severity and physical crack width require independent measurement and judgement.")
+
+    page(story, "PART I  /  BHAVISHYA KUMAR SINGH", "Working with video evidence",
+         "Frame sampling limits computational cost. Repeat counting reduces inflated totals in a stable camera view.")
+    block(story, "Upload or connect, then sample",
+          "The video path decodes frames using OpenCV, converts frame arrays to RGB for the detector, and samples by frame index. Processing every tenth frame of a 30 fps video produces about three inspected frames per second before compute and network effects. The sampling interval trades event coverage against GPU or CPU load. Results retain frames and timestamps so reviewers can inspect the source.",
+          "An RTSP source uses the same inference path. The scheduled-worker workflow runs bounded capture and processing batches. The code limits work per request and handles unreachable sources as failures rather than fabricating defect records.")
+    block(story, "Two different uses of overlap",
+          "Within one image, YOLO postprocessing suppresses overlapping boxes as part of inference. Across sampled frames, the current video summary treats a same-class box with IoU greater than 0.50 against an already counted box as a repeat. This produces a unique-count estimate. It does not provide persistent tracks and assumes image positions stay comparable.",
+          "The BIM mapper uses a separate 3D rule after it has an element and position. Image-plane overlap is unsuitable for matching detections across cameras because the same defect can appear at different pixel positions. Part II explains the surface-based merge.")
+    block(story, "Structured handoff",
+          "A detection contributes the source identity, sampling timestamp, class, confidence and severity score together with the original-image box. Its position can be computed from the average of the upper-left and lower-right corners. The viewer retains the annotated evidence. The downstream mapper needs the camera model and original pixel dimensions to interpret the selected point.")
+    story.append(table(["Scenario", "Expected consequence"], [
+        ("Camera shake or zoom", "Pixel overlap can fall even when the defect has not moved. Review repeated counts and recalibrate if stream geometry changes."),
+        ("A temporarily occluded area", "A sampled frame may provide no useful view. Absence of a prediction is not evidence that the surface is clear."),
+        ("Nearby same-class defects", "Similar overlapping boxes can be counted together. Review the source frames where this matters."),
+    ], [.32, .68]))
+
+    page(story, "PART I  /  BHAVISHYA KUMAR SINGH", "Detection contribution and evidence",
+         "The contribution is a concrete-inspection workflow built around established vision algorithms.")
+    block(story, "What Student 1 contributes",
+          "<b>Unified concrete taxonomy.</b> The project brings seven classes into one localized detector and normalizes labels across dataset sources. It can report several defect types without reducing the output to image-level crack or no-crack classification.",
+          "<b>Operational output.</b> The same inference wrapper handles uploaded photos, sampled video and camera frames. It turns boxes into typed, scored, evidence-linked observations that a geometry pipeline can consume.",
+          "<b>Priority and repeat handling.</b> Optional learned severity, an explainable fallback, and video repeat counting provide a review path on machines with and without a separate severity checkpoint. YOLO, ResNet, IoU and non-maximum suppression are established methods. The contribution is their adaptation and combination for inspection.")
+    block(story, "Checkpoint evidence and the correct benchmark",
+          "The repository audit reports the following embedded validation metrics for the actual bundled weights. These are checkpoint metadata. The raw dataset and complete run provenance are unavailable, so an independent rerun is still needed.")
+    story.append(table(["Precision", "Recall", "mAP at IoU 0.50", "mAP at IoU 0.50-0.95"], [
+        ("59.57%", "51.33%", "54.74%", "29.70%"),
+    ], [.20, .19, .27, .34]))
+    story.append(Spacer(1, 13))
+    block(story, "How to evaluate the detector",
+          "Match each prediction to at most one same-class reference box at a defined intersection-over-union threshold. Precision is the proportion of reported detections that match. Recall is the proportion of labelled defects found. Average precision summarizes the precision-recall curve, and mAP averages over classes or IoU thresholds as stated. For site video, also count false alerts per interval and measure missed defects by class and size.",
+          "The integrated simulation later in this report verifies the software handoff. It cannot substitute for independent site images or expert severity labels.")
+
+    page(story, "PART II  /  KRISHAN JANGIR", "Registering a camera in BIM",
          "Calibration relates pixels to the IFC coordinate system by observing a marker of known size and pose.")
     block(story, "Import the model and place the marker",
           "Choose the project and upload the correct IFC version. IFC elements have persistent GlobalIds and shape representations. In Markers, search the viewer's element list or click a surface. The selected point becomes the marker centre. The UI displays the surface direction, the marker's top edge and a preview of the printed square.",
@@ -222,6 +317,32 @@ def build():
     block(story, "Why mapping can fail",
           "The centre of a defect box may fall outside the crack, on a foreground object, or on a neighbouring element. Camera movement, poor intrinsics, wrong marker measurements, and differences between the built surface and the IFC geometry can displace a pin or cause a missed ray. A surface hit indicates geometrical correspondence. The inspector still verifies the evidence.")
 
+    page(story, "PART II  /  KRISHAN JANGIR", "Geometry, intersection and identity",
+         "A camera pixel determines a direction only. The IFC geometry supplies the surface and its identity.")
+    story.append(ray_diagram())
+    story.append(para("Figure 1. Conceptual cross-section. Multiple surfaces can lie along the same ray. The nearest eligible triangle supplies the reported hit.", "caption"))
+    block(story, "Worked example with simplified coordinates",
+          "Take camera centre C = (0, 0, 0), identity orientation and focal lengths of 800 pixels. A box centre 80 pixels to the right of the principal point gives the unnormalized direction (0.10, 0, 1). Suppose the ray lands inside a wall triangle at Z = 5 m and inside another at Z = 8 m. Their intersections are (0.50, 0, 5) and (0.80, 0, 8). The first wall is the returned element. The example is schematic and independent of the final simulation.")
+    block(story, "Moller-Trumbore in the implementation",
+          "The fallback intersection solves C + s d = A + u(B - A) + v(D - A), where A, B and D are triangle vertices. It rejects near-parallel rays, barycentric points outside the triangle (u or v negative, or u + v above 1), and nonpositive distances. Across eligible hits, keep the smallest distance. Trimesh provides an accelerated alternative.")
+    block(story, "Viewer versus IFC coordinates",
+          "The viewer uses a display-axis convention for Three.js, while calibration and persisted defect positions use IFC world axes and metres. A click on the mesh is converted back into IFC coordinates before saving a marker. When a stored position is drawn as a pin, it passes through the inverse conversion. The database links the GUID to the selected model version so another upload cannot silently reinterpret the point.")
+
+    page(story, "PART II  /  KRISHAN JANGIR", "BIM mapping contribution",
+         "The contribution combines BIM-anchored camera references with per-observation geometry and an inspector-facing model.")
+    block(story, "What Student 2 contributes",
+          "<b>BIM-anchored registration.</b> The inspector creates a printable marker from an IFC surface point, orientation and measured size. The same registry drives both printing and recovery of 3D marker corners. A fixed camera can recover its pose when it sees a registered marker. A known model coordinate still depends on an accurate as-built installation.",
+          "<b>Selection among visible candidates.</b> A camera may observe many structural elements. The frustum limits the candidate list, and each defect uses its own pixel ray. This resolves individual IFC GUIDs without assigning every detection to a camera's single zone label.",
+          "<b>Persistent review context.</b> The system records the association to an IFC version and GlobalId, and uses position proximity to merge repeated observations after mapping. The viewer presents the saved location with the capture so the inspector can correct errors. Trigonometry, ArUco, PnP and raycasting are established. The project contribution is how these mechanisms are connected and used for fixed-camera concrete inspection.")
+    story.append(table(["Related work", "Relationship to this project"], [
+        ("Mishra et al. [3]", "Uses a mobile calibration robot and fiducial for multi-camera registration. This project uses a marker registered against a fixed IFC surface."),
+        ("Hsieh et al. [4]", "Links camera recognition to BIM components for progress monitoring. This project targets surface defect observations and their lifecycle."),
+        ("Chen et al. [5]", "Registers aerial images to BIM for defect reconstruction. This project uses a fixed camera and a known marker during setup."),
+    ], [.27, .73]))
+    story.append(Spacer(1, 12))
+    block(story, "Scope of the novelty claim",
+          "These examples establish overlapping ideas. The defensible novelty claim is the project's specific application and integration. The current repository stores BIM-linked observations in PostgreSQL and displays them over the IFC. Direct IFC property-set or BCF write-back remains outside the implemented scope.")
+
     page(story, "USER EXPERIENCE  /  END-TO-END WORKFLOW", "Operate and review an inspection",
          "A project workspace lets the inspector move from manual evidence upload to scheduled, mapped inspection.")
     story.append(table(["Screen", "What the user does", "What to check"], [
@@ -242,11 +363,29 @@ def build():
     block(story, "Scheduled operation and recovery",
           "After successful calibration, the worker claims due camera jobs using a database lease, processes bounded inspections, and releases the claim. Monitoring status depends on the worker heartbeat. If the worker is offline or calibration fails, the camera remains registered. The inspector can preview the stream, resolve the issue and retry from its card.",
           "If the camera moves or the model changes, verify calibration again before using mapped results. Video and Detection do not require duplicate camera registration. The scheduler performs periodic batches, so an inspection interval is not continuous real-time recording.")
+    block(story, "Manually assign an unresolved observation",
+          "In the BIM Viewer's Defects tab, select <b>Map</b> on an unmapped item and click the correct IFC surface. The system saves the selected model, element and point. The inspector can remove an incorrect assignment before mapping it again.")
 
-    page(story, "INTEGRATED EVIDENCE  /  SCHEPENDOMLAAN", "Two simulated cracks, one workflow",
+    page(story, "SHARED APPLICATION  /  TECHNOLOGY AND DATA", "Software stack and records",
+         "The integration turns a transient detection into a traceable inspection with a source image, project, location and review status.")
+    story.append(table(["Layer", "Tools and implementation"], [
+        ("Web interface", "Next.js, React and TypeScript for forms, dashboard and review. Three.js and web-ifc for geometry and 3D picking."),
+        ("Service/API", "Python and FastAPI for authenticated REST endpoints. SQLAlchemy and Alembic manage data and PostgreSQL schema changes."),
+        ("Vision", "Ultralytics YOLO11 and PyTorch for inference. Pillow and OpenCV decode images and sampled video. OpenCV detects ArUco corners and solves pose."),
+        ("Geometry", "IfcOpenShell supplies structural meshes. NumPy handles transforms and frustum tests. Trimesh or explicit ray-triangle intersection yields surface hits."),
+        ("Storage and jobs", "PostgreSQL stores project entities, scheduled camera claims, and audit events. Protected local storage serves IFC and evidence. A separate scheduler processes camera batches."),
+    ], [.22, .78]))
+    story.append(Spacer(1, 12))
+    block(story, "Records and relationships",
+          "An organization contains users and projects. A project contains uploaded IFC versions, markers, cameras and defects. Calibration links a camera to a model and holds intrinsics, pose and candidate GlobalIds. Mapped defects retain model ID, element GlobalId, world position and source evidence. An unresolved observation lacks a verified 3D location and should be inspected before accepting a pin.")
+    block(story, "Review lifecycle and access",
+          "The review stages include detected, confirmed, assigned, in progress, resolved and verified. Defect changes are auditable. The dashboard summarizes critical alerts and reports can export CSV for inspection follow-up. External notification delivery remains future work.",
+          "Authentication and project-scoped media checks govern access to IFC models, photos and inspection history. The backend keeps camera and database credentials out of public evidence. For deployment, use a protected database, an HTTPS reverse proxy and explicit authorization for each RTSP source.")
+
+    page(story, "INTEGRATED EVIDENCE  /  SCHEPENDOMLAAN", "Pipeline validation",
          "The current demonstration uses one IFC model, one fixed virtual camera and two known wall defects.")
     story.append(figure("08-detector-to-bim.png",
-                        "Figure 3. Current run: every YOLO box was submitted to the mapper. C3 and C4 match reference cracks and the other boxes are unmatched alerts."))
+                        "Figure 2. Recorded output: C3 and C4 match reference cracks. The other two boxes are false alerts.", width=458))
     block(story, "Controlled setup",
           "The renderer uses a fixed 1280 x 720 virtual pinhole camera with 57 degrees horizontal field of view and a virtual ArUco marker. The IFC surfaces give reference GlobalIds and world coordinates. The calibration receives the rendered image and marker data. The true camera pose is held back for scoring.")
     story.append(table(["Crack", "Reference-pixel mapping error", "YOLO-box mapping error", "IFC element"], [
@@ -256,6 +395,7 @@ def build():
     ], [.13, .30, .28, .29]))
     story.append(Spacer(1, 10))
     block(story, "What the measurements show",
+          f"Two cracks were simulated and both were detected. There were {false_positive} false alerts on the crack frame and {clean_count} on the clean control. This selected demonstration does not establish 100% accuracy.",
           f"The mapper assigned {correct_known} of {len(known)} known reference pixels and {correct_automatic} of {matched} matched YOLO boxes to the expected elements. "
           f"Mean 3D position error from reference pixels was {mean(point_errors):.2f} cm. The marker reprojection error was "
           f"{result['reprojection_error_px']:.3f} pixels, but the camera position estimate differed by {result['pose_error_cm']:.2f} cm. "
@@ -274,11 +414,29 @@ def build():
         ("Operations", "Exercise authorized RTSP feeds during network loss and reconnection. Test coverage, scheduling latency, duplicate handling and evidence access across projects."),
     ], [.24, .76]))
     story.append(Spacer(1, 14))
-    block(story, "Source and inspection evidence",
+    block(story, "Joint contribution and remaining work",
+          "The integrated system pairs an evidence-producing detector with a geometry-based mapper and a review workflow. Each subsystem can be evaluated independently, which exposes whether an error came from a missed detection, calibration, a wrong surface hit, or a duplicate record.",
+          "Future work includes calibrated physical sizing, expert-validated severity, markerless or alternative registration, more extensive multi-camera testing, and model-native export. These require evaluation before they can support operational claims.")
+
+    page(story, "REFERENCES  /  PROJECT SOURCES", "Sources for the two contributions",
+         "The student presentations establish authorship and scope. The current repository and evidence establish implementation and results.")
+    block(story, "Student presentations",
+          "<b>Bhavishya Kumar Singh.</b> <i>AI-Driven Defect Detection &amp; Severity Analysis for Real-Time Structural Health Monitoring with BIM Integration.</i> Supplied presentation and speaker notes. Used to identify the scope of Part I.",
+          "<b>Krishan Jangir.</b> <i>Automated Mapping of Detected Concrete Defects onto BIM Elements.</i> Supplied mid-term presentation. Used to identify the scope of Part II.")
+    block(story, "Primary technical references",
+          f"[1] {external('Redmon et al., You Only Look Once: Unified, Real-Time Object Detection', 'https://arxiv.org/abs/1506.02640')}. CVPR, 2016.",
+          f"[2] {external('Ultralytics, YOLO11 model documentation', 'https://docs.ultralytics.com/models/yolo11/')}. Model family used in the detector.",
+          f"[3] {external('Mishra et al., Look Both Ways: Bidirectional Visual Sensing for Automatic Multi-Camera Registration', 'https://arxiv.org/abs/2208.07362')}. 2022.",
+          f"[4] {external('Hsieh et al., Integration of Construction Progress Monitoring Results Using AI Image Recognition from Multiple Cameras onto a BIM', 'https://doi.org/10.22260/ISARC2024/0090')}. ISARC, 2024.",
+          f"[5] {external('Chen et al., Automatic concrete defect detection and reconstruction by aligning aerial images onto semantic-rich building information model', 'https://doi.org/10.1111/mice.12928')}.",
+          f"[6] {external('OpenCV, Perspective-n-Point pose computation', 'https://docs.opencv.org/4.x/d5/d1f/calib3d_solvePnP.html')}.")
+    block(story, "Repository implementation and evidence",
           f"{link('Project README and setup', 'README.md')}<br/>"
-          f"{link('Detection implementation', 'backend/ml/inference/detector.py')}<br/>"
+          f"{link('Dataset preparation code', 'backend/ml/training/download_dataset.py')}<br/>"
+          f"{link('Detector implementation', 'backend/ml/inference/detector.py')}<br/>"
           f"{link('Camera calibration', 'backend/ml/calibration/camera_calibrator.py')}<br/>"
           f"{link('BIM mapping implementation', 'backend/app/services/auto_mapper.py')}<br/>"
+          f"{link('Checkpoint provenance audit', 'docs/project_audit_2026-11-18.md')}<br/>"
           f"{link('Current demonstration evidence and walkthrough', 'runs/bim-simulation/README.md')}<br/>"
           f"{link('Deployment and acceptance checks', 'docs/deployment.md')}")
     doc = SimpleDocTemplate(str(OUTPUT), pagesize=A4, leftMargin=42, rightMargin=42,
