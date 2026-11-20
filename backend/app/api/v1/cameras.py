@@ -49,6 +49,7 @@ async def _verify_project_access(
         raise ForbiddenError("Access denied to this project")
 
 
+@router.get("", response_model=CameraListResponse, include_in_schema=False)
 @router.get("/", response_model=CameraListResponse)
 async def list_cameras(
     project_id: uuid.UUID = Query(..., description="Project ID"),
@@ -70,6 +71,7 @@ async def list_cameras(
     )
 
 
+@router.post("", response_model=CameraResponse, include_in_schema=False)
 @router.post("/", response_model=CameraResponse)
 async def create_camera(
     body: CameraCreate,

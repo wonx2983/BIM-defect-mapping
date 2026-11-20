@@ -38,6 +38,7 @@ async def _verify_project_access(
         raise ForbiddenError("Access denied to this project")
 
 
+@router.get("", response_model=DefectListResponse, include_in_schema=False)
 @router.get("/", response_model=DefectListResponse)
 async def list_defects(
     project_id: uuid.UUID = Query(..., description="Project ID (required)"),

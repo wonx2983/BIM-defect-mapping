@@ -47,6 +47,7 @@ async def _enrich_project(project: Project, db: AsyncSession) -> ProjectResponse
     )
 
 
+@router.get("", response_model=ProjectListResponse, include_in_schema=False)
 @router.get("/", response_model=ProjectListResponse)
 async def list_projects(
     search: str | None = Query(None, description="Search by project name"),
@@ -79,6 +80,7 @@ async def list_projects(
     return ProjectListResponse(projects=enriched, total=total)
 
 
+@router.post("", response_model=ProjectResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=ProjectResponse, status_code=201)
 async def create_project(
     body: ProjectCreate,

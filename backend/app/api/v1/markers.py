@@ -41,6 +41,7 @@ async def _verify_project_access(
         raise ForbiddenError("Access denied to this project")
 
 
+@router.get("", response_model=MarkerListResponse, include_in_schema=False)
 @router.get("/", response_model=MarkerListResponse)
 async def list_markers(
     project_id: uuid.UUID = Query(..., description="Project ID"),
@@ -62,6 +63,7 @@ async def list_markers(
     )
 
 
+@router.post("", response_model=MarkerResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=MarkerResponse, status_code=201)
 async def create_marker(
     body: MarkerCreate,
