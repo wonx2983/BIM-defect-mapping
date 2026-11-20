@@ -17,3 +17,17 @@ python present_mapping_simulation.py ../runs/bim-simulation
 ```
 
 The presentation script uses FFmpeg and Windows Segoe UI fonts. The experimental result is software evidence from one simulated viewpoint. Live transport, physical calibration tolerances, and field detection accuracy need separate tests.
+
+## Detector evaluation on the saved frames
+
+[Detector evaluation](detector-evaluation.json) reruns the bundled application detector on the original positive and clean frames. Its [label manifest](detector-evaluation-manifest.json) contains the two crack boxes from the simulation ground truth and an empty label list for the clean frame. At confidence 0.25 and matching IoU 0.50, the evaluator recorded 2 true positives, 5 false positives and 0 misses across the two images. All five false positives were classified as efflorescence, including three on the clean frame. These results cover one virtual viewpoint and one labelled defect class.
+
+From `backend`, rerun against a new output path:
+
+```bash
+python -m ml.evaluate_detector \
+  --manifest ../runs/bim-simulation/detector-evaluation-manifest.json \
+  --out /tmp/defectsync-simulation-evaluation.json
+```
+
+A separate video smoke test encoded four copies of the positive frame at 4 fps as an MJPEG clip and ran the bundled detector on every frame. It produced 22 frame detections and eight fixed-camera sighting groups with the default two-second gap and 0.50 IoU. This checks decoding and repeat grouping. Some groups contain false detections, so the group count cannot be interpreted as the physical crack count.

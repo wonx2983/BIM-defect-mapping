@@ -83,6 +83,7 @@ export interface AutoMappingResult {
     hit_distance_m: number | null;
     was_deduplicated: boolean;
     defect_id: string | null;
+    mapping_error: string | null;
   }>;
   status: string;
 }

@@ -1,0 +1,237 @@
+{
+  "manifest_sha256": "4526b0d552fa6c4f3e5c41dd29ada5ff928ff7d87103d54436f8ca7a049df43a",
+  "weights_sha256": "f491db792a11bcc07a0d38ddd11bf3667bf6497b29a8f711616c12aa41ea59df",
+  "confidence_threshold": 0.25,
+  "matching_iou_threshold": 0.5,
+  "device": "cpu",
+  "evaluated_classes": [
+    "crack",
+    "spalling",
+    "exposed_rebar",
+    "corrosion",
+    "efflorescence",
+    "scaling",
+    "honeycombing"
+  ],
+  "runtime": {
+    "python": "3.13.9",
+    "torch": "2.13.0",
+    "ultralytics": "8.3.0"
+  },
+  "summary": {
+    "images": 2,
+    "capture_sessions": 1,
+    "overall": {
+      "tp": 2,
+      "fp": 5,
+      "fn": 0,
+      "precision": 0.2857142857142857,
+      "recall": 1.0,
+      "f1": 0.4444444444444444
+    },
+    "by_class": {
+      "crack": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "spalling": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      },
+      "exposed_rebar": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      },
+      "corrosion": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      },
+      "efflorescence": {
+        "tp": 0,
+        "fp": 5,
+        "fn": 0,
+        "precision": 0.0,
+        "recall": null,
+        "f1": 0.0
+      },
+      "scaling": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      },
+      "honeycombing": {
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      }
+    },
+    "clean_images": 1,
+    "clean_images_with_alerts": 1,
+    "clean_false_positives": 3,
+    "median_inference_ms": 823.4570026397705
+  },
+  "images": [
+    {
+      "image": "01-virtual-camera.png",
+      "session": "schependomlaan-virtual-camera",
+      "image_sha256": "7977af111fc18922c7c29cc00aa57e8cfde2f747937fe04b4a00d42b41d22fa9",
+      "labels": [
+        {
+          "defect_class": "crack",
+          "bbox_pixels": {
+            "x1": 808,
+            "y1": 404,
+            "x2": 868,
+            "y2": 455
+          }
+        },
+        {
+          "defect_class": "crack",
+          "bbox_pixels": {
+            "x1": 456,
+            "y1": 269,
+            "x2": 515,
+            "y2": 311
+          }
+        }
+      ],
+      "inference_ms": 1541.2051677703857,
+      "width": 1280,
+      "height": 720,
+      "matches": [
+        {
+          "prediction": {
+            "defect_class": "crack",
+            "confidence": 0.4934688210487366,
+            "bbox_pixels": {
+              "x1": 804,
+              "y1": 392,
+              "x2": 873,
+              "y2": 461
+            }
+          },
+          "label": {
+            "defect_class": "crack",
+            "bbox_pixels": {
+              "x1": 808,
+              "y1": 404,
+              "x2": 868,
+              "y2": 455
+            }
+          },
+          "iou": 0.6427221172022685
+        },
+        {
+          "prediction": {
+            "defect_class": "crack",
+            "confidence": 0.39725175499916077,
+            "bbox_pixels": {
+              "x1": 447,
+              "y1": 257,
+              "x2": 517,
+              "y2": 319
+            }
+          },
+          "label": {
+            "defect_class": "crack",
+            "bbox_pixels": {
+              "x1": 456,
+              "y1": 269,
+              "x2": 515,
+              "y2": 311
+            }
+          },
+          "iou": 0.5709677419354838
+        }
+      ],
+      "false_positives": [
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.35193318128585815,
+          "bbox_pixels": {
+            "x1": 1108,
+            "y1": 482,
+            "x2": 1186,
+            "y2": 517
+          }
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2917027771472931,
+          "bbox_pixels": {
+            "x1": 274,
+            "y1": 638,
+            "x2": 355,
+            "y2": 687
+          }
+        }
+      ],
+      "misses": []
+    },
+    {
+      "image": "02-clean-control.png",
+      "session": "schependomlaan-virtual-camera",
+      "image_sha256": "17ff464f8ca14288207bf96ab06ccffce61b4cb411a9bc8f55721961128d7e66",
+      "labels": [],
+      "inference_ms": 105.70883750915527,
+      "width": 1280,
+      "height": 720,
+      "matches": [],
+      "false_positives": [
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.445406973361969,
+          "bbox_pixels": {
+            "x1": 274,
+            "y1": 638,
+            "x2": 355,
+            "y2": 687
+          }
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.4125221371650696,
+          "bbox_pixels": {
+            "x1": 1108,
+            "y1": 482,
+            "x2": 1186,
+            "y2": 517
+          }
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.335287481546402,
+          "bbox_pixels": {
+            "x1": 1105,
+            "y1": 674,
+            "x2": 1193,
+            "y2": 703
+          }
+        }
+      ],
+      "misses": []
+    }
+  ]
+}

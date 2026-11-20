@@ -4,7 +4,8 @@ import uuid
 import cv2
 from app.core.exceptions import ValidationError
 from app.services.uploads import project_directory, upload_url
-from ml.inference.video_processor import process_rtsp_frames, FrameDetection
+from ml.inference.video_processor import process_rtsp_frames
+from ml.inference.video_tracks import FrameDetection
 
 
 def capture_observations(camera, detector, max_frames):
@@ -17,7 +18,6 @@ def capture_observations(camera, detector, max_frames):
             raise ValidationError("Stream resolution changed; recalibrate the camera")
         frame = FrameDetection(index, (time.monotonic() - started) * 1000,
                                inference.detections, inference.inference_time_ms)
-        frame.snapshot_url = ""
         if inference.detections:
             path = project_directory(camera.project_id, "camera-evidence") / f"{uuid.uuid4().hex}.jpg"
             if not cv2.imwrite(str(path), annotated):

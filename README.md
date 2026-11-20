@@ -24,6 +24,25 @@ The handoff is the detection box centre in original image pixels plus the identi
 4. Open **Cameras** and register an authorized RTSP source with its horizontal field of view and inspection interval. One visible registered marker can calibrate a fixed camera. Preview the frame and retry calibration if needed. With the scheduler online, a calibrated camera can start periodic inspections without a second registration.
 5. Review mapped pins and unresolved observations. Verify the element and original evidence, update the record, and export the inspection list as CSV.
 
+## Validate the detector and video workflow
+
+The **Video** upload page offers fixed-camera grouping for a stationary view with no pan, zoom or cuts. Same-class boxes with at least 0.50 IoU can join a group when the last sighting was within two seconds. Each group accepts at most one detection per sampled frame. The result preserves the per-frame detections, and auto-save writes one inspection record per group with the highest-confidence evidence and the first and last sighting times. The group count estimates repeated sightings in image space. A long gap starts a new group. Leave grouping off for handheld or edited footage.
+
+The optional repeat-confirmation control saves only groups seen in at least two samples within the two-second association window. Review single sightings in the frame gallery. See the [detector and video experiments](runs/detector-review/README.md) for the measured effects on false alerts, missed defects and inference time.
+
+For a fixed-threshold detector test, create a JSON manifest from an independent labelled set. Use the [simulation manifest](runs/bim-simulation/detector-evaluation-manifest.json) as a format example. For each image give its path relative to the manifest, a capture-session ID, and original-image pixel boxes under `labels`. Use an empty list only for an image verified to contain none of the evaluated classes. Pass `--class crack` for a crack-only set so unlabelled classes are excluded from scoring. Keep the test sessions separate from sessions used for training or threshold selection.
+
+From `backend`, run:
+
+```bash
+python -m ml.evaluate_detector \
+  --manifest /path/to/test-manifest.json \
+  --out /path/to/detector-evaluation.json \
+  --confidence 0.25 --match-iou 0.50
+```
+
+The output records the model, manifest and image hashes, per-class precision and recall, matched boxes, false positives, misses, and alerts on clean images. A class with no reference labels has undefined recall, written as `null`. Use a separate precision–recall sweep for AP and mAP.
+
 ## How it works
 
 - **Detection:** The bundled YOLOv11 checkpoint recognizes crack, spalling, exposed rebar, corrosion, efflorescence, scaling, and honeycombing. The confidence threshold filters boxes. Severity is an estimate; image measurements are in pixels unless a valid physical measurement method is supplied.

@@ -92,7 +92,8 @@ async def test_worker_claims_distinct_cameras_and_releases_after_processing(cont
     assert {first, second} == expected
     assert await scheduler.claim_due_camera() is None
     calls = []
-    async def inspect(camera_id, frames, db, user):
+    async def inspect(camera_id, frames, db, user, *, persist_unmapped):
+        assert not persist_unmapped
         calls.append(camera_id)
         camera = await db.get(Camera, camera_id)
         camera.status = CameraStatus.ACTIVE

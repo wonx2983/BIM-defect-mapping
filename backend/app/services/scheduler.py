@@ -54,7 +54,7 @@ async def process_claim(camera_id):
                 await db.commit()
                 raise RuntimeError("Camera owner is unavailable or read-only")
             db.info["actor_id"] = user.id
-            await run_auto_mapped_detection(camera_id, 30, db, user)
+            await run_auto_mapped_detection(camera_id, 30, db, user, persist_unmapped=False)
         except Exception:
             await db.rollback()
             camera = await db.get(Camera, camera_id)

@@ -994,6 +994,11 @@ export default function ViewerPage() {
                           <div className={styles.defectMeta}>{d.severity} • {(d.confidence * 100).toFixed(0)}%</div>
                         </div>
                         <div className={styles.defectActions}>
+                          {d.source_image_url.startsWith('/uploads/') && (
+                            <a className={styles.mapBtn} href={d.source_image_url} target="_blank" rel="noopener noreferrer">
+                              Evidence
+                            </a>
+                          )}
                           <button
                             className={`${styles.mapBtn} ${mappingDefectId === d.id ? styles.mapBtnActive : ''}`}
                             onClick={() => setMappingDefectId(mappingDefectId === d.id ? null : d.id)}
@@ -1214,9 +1219,15 @@ export default function ViewerPage() {
                           <span className={styles.resultValue}>{cameraResult.total_detections}</span>
                         </div>
                         <div className={styles.resultItem}>
-                          <span className={styles.resultLabel}>Unique Defects Saved</span>
+                          <span className={styles.resultLabel}>{cameraResult.mapped_count != null ? 'New BIM Pins' : 'Observations Saved'}</span>
                           <span className={styles.resultValue}>{cameraResult.mapped_count ?? cameraResult.unique_defects_saved}</span>
                         </div>
+                        {!!cameraResult.unmapped_count && (
+                          <div className={styles.resultItem}>
+                            <span className={styles.resultLabel}>Unmapped for Review</span>
+                            <span className={styles.resultValue}>{cameraResult.unmapped_count}</span>
+                          </div>
+                        )}
                         {cameraResult.bim_zone && (
                           <div className={styles.resultItem}>
                             <span className={styles.resultLabel}>BIM Zone</span>

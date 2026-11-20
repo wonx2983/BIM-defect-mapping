@@ -276,6 +276,7 @@ async def run_auto_mapped_detection(
     max_frames: int = Query(default=50, ge=1, le=300, description="Max frames to analyze"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
+    persist_unmapped: bool = True,
 ):
     """Run defect detection on a calibrated camera's RTSP feed with automatic BIM mapping.
 
@@ -283,7 +284,7 @@ async def run_auto_mapped_detection(
     raycast against BIM → de-duplicate → save.
 
     Requires the camera to be calibrated first (POST .../calibrate).
-    Falls back to simple zone-based mapping if uncalibrated.
+    Manual runs retain ray misses for inspection; scheduled runs can opt out.
     """
     result = await db.execute(select(Camera).where(Camera.id == camera_id))
     camera = result.scalar_one_or_none()
@@ -393,6 +394,7 @@ async def run_auto_mapped_detection(
                 pixel_y=cy,
                 bbox=det.bbox if hasattr(det, "bbox") else bbox,
                 camera_id=str(camera.id),
+                timestamp_ms=int(fd.timestamp_ms),
                 source_image_url=fd.snapshot_url,
             ))
 
@@ -418,6 +420,7 @@ async def run_auto_mapped_detection(
     inspection_id = record_inspection(db, camera.project_id, user.id, "Calibrated camera inspection")
     persisted = {}
     for mr in mapping_results:
+        defect_id = None
         if mr.mapped_element_guid:
             defect = persisted.get(mr.record_id)
             if defect is None and mr.was_deduplicated:
@@ -448,14 +451,27 @@ async def run_auto_mapped_detection(
                 db.add(defect)
                 mapped_count += 1
             persisted[mr.record_id] = defect
+            defect_id = mr.record_id
         else:
             unmapped_count += 1
+            if persist_unmapped:
+                detection = mr.detection
+                db.add(Defect(
+                    id=uuid.UUID(mr.record_id), project_id=camera.project_id, inspection_id=inspection_id,
+                    bim_model_id=camera.bim_model_id, defect_class=DefectClass(detection.defect_class),
+                    severity=SeverityLevel(detection.severity), severity_score=detection.severity_score,
+                    confidence=detection.confidence, bbox=detection.bbox,
+                    source_image_url=detection.source_image_url, status=DefectStatus.DETECTED,
+                    created_by_id=user.id,
+                    notes=f"Camera {camera.name}: no BIM surface hit. Review the frame before placing a pin.",
+                ))
+                defect_id = mr.record_id
         result_items.append(MappingResultItem(
             defect_class=mr.detection.defect_class, confidence=mr.detection.confidence,
             severity=mr.detection.severity, mapped_element_guid=mr.mapped_element_guid,
             hit_position=dict(zip(("x", "y", "z"), mr.hit_position)) if mr.hit_position else None,
             hit_distance_m=mr.hit_distance_m, was_deduplicated=mr.was_deduplicated,
-            defect_id=mr.record_id if mr.mapped_element_guid else None))
+            defect_id=defect_id, mapping_error=mr.error))
 
     # Update camera stats
     camera.status = CameraStatus.ACTIVE

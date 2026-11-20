@@ -178,6 +178,45 @@ async def test_auto_mapping_api_centroid_and_duplicate_persistence(context, monk
     assert defects[0].world_position == pytest.approx({"x": 5., "y": 10., "z": 1.5})
 
 
+async def test_manually_triggered_ray_miss_preserves_unmapped_evidence(context, monkeypatch):
+    from ml.calibration import ifc_geometry
+
+    camera = context.cameras[0]
+    rotation, intrinsics, _, _ = synthetic_scene()
+    camera.calibration_status = "calibrated"
+    camera.intrinsics = intrinsics.to_dict()
+    camera.pose_rotation = {"matrix": rotation.flatten().tolist()}
+    camera.pose_translation = dict(zip(("x", "y", "z"), scene.GT_CAMERA_POS.tolist()))
+    camera.image_width, camera.image_height = 1920, 1080
+    camera.candidate_element_guids = ["wall-north-001"]
+    await context.db.commit()
+    frame = FrameDetection(0, 0, [detection()], 1, "/uploads/miss.jpg")
+    monkeypatch.setattr("app.api.v1.calibration.get_detector", lambda: object())
+    monkeypatch.setattr("app.services.camera_capture.capture_observations", lambda *a: [frame])
+    monkeypatch.setattr("app.api.v1.calibration._get_ifc_path", lambda *a: Path("miss.ifc"))
+    monkeypatch.setattr(ifc_geometry, "extract_meshes_from_ifc", lambda *a: {
+        guid: (vertices + 100, faces) for guid, (vertices, faces) in scene.build_box_room_meshes().items()
+    })
+    url = f"/api/v1/calibration/{camera.id}/auto-detect"
+    scheduled = await context.client.post(url, params={"persist_unmapped": False})
+    assert scheduled.status_code == 200, scheduled.text
+    assert scheduled.json()["results"][0]["defect_id"] is None
+    response = await context.client.post(url)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["mapped_count"] == 0 and result["unmapped_count"] == 1
+    item = result["results"][0]
+    assert item["mapping_error"]
+    defect, = (await context.db.scalars(select(Defect))).all()
+    assert str(defect.id) == item["defect_id"]
+    assert defect.bim_element_guid is None and defect.world_position is None
+    assert defect.source_image_url == "/uploads/miss.jpg"
+    listing = await context.client.get(f"/api/v1/bim/{camera.project_id}/defects-mapped",
+                                       params={"model_id": str(camera.bim_model_id)})
+    assert listing.status_code == 200, listing.text
+    assert [row["id"] for row in listing.json()["unmapped"]] == [str(defect.id)]
+
+
 async def test_rtsp_failure_is_not_completed(context, monkeypatch):
     def fail(*a, **k):
         raise AppException("Camera offline", "CAMERA_UNAVAILABLE", 502)

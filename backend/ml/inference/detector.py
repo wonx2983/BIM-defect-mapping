@@ -126,12 +126,14 @@ class DefectDetector:
         severity_model_path: str | Path | None = None,
         device: str = "cpu",
         confidence_threshold: float = 0.25,
+        image_size: int = 640,
     ):
         import time
 
         self._inference_lock = Lock()
         self.device = device
         self.confidence_threshold = confidence_threshold
+        self.image_size = image_size
 
         # Load YOLO detector
         logger.info(f"Loading YOLO detector from {detector_path}")
@@ -206,6 +208,7 @@ class DefectDetector:
         yolo_results = self.yolo(
             image,
             conf=self.confidence_threshold,
+            imgsz=self.image_size,
             device=self.device,
             verbose=False,
         )

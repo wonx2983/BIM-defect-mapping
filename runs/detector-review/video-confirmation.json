@@ -1,0 +1,351 @@
+{
+  "weights_sha256": "f491db792a11bcc07a0d38ddd11bf3667bf6497b29a8f711616c12aa41ea59df",
+  "manifest_sha256": "4526b0d552fa6c4f3e5c41dd29ada5ff928ff7d87103d54436f8ca7a049df43a",
+  "fps": 4,
+  "codec": "MJPG",
+  "frame_skip": 1,
+  "confidence_threshold": 0.25,
+  "matching_iou": 0.5,
+  "cases": [
+    {
+      "case": "repeated_cracks",
+      "sampled_frames": 4,
+      "frame_detections": 22,
+      "policies_by_minimum_sightings": {
+        "1": {
+          "saved_candidates": 8,
+          "tp": 2,
+          "fp": 6,
+          "fn": 0,
+          "precision": 0.25,
+          "recall": 1.0,
+          "f1": 0.4,
+          "matched_confirmation_delay_ms": []
+        },
+        "2": {
+          "saved_candidates": 5,
+          "tp": 2,
+          "fp": 3,
+          "fn": 0,
+          "precision": 0.4,
+          "recall": 1.0,
+          "f1": 0.5714285714285714,
+          "matched_confirmation_delay_ms": [
+            250.0,
+            250.0
+          ]
+        }
+      },
+      "tracks": [
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.6576,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.6352,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.5624,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "crack",
+          "confidence": 0.4694,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 1,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3698,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3091,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2647,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "crack",
+          "confidence": 0.319,
+          "first_seen_ms": 250.0,
+          "last_seen_ms": 750.0,
+          "sightings": 3,
+          "second_seen_ms": 500.0,
+          "evidence_frame_index": 1,
+          "snapshot_url": null
+        }
+      ]
+    },
+    {
+      "case": "cracks_in_one_sample",
+      "sampled_frames": 4,
+      "frame_detections": 22,
+      "policies_by_minimum_sightings": {
+        "1": {
+          "saved_candidates": 8,
+          "tp": 1,
+          "fp": 7,
+          "fn": 1,
+          "precision": 0.125,
+          "recall": 0.5,
+          "f1": 0.2,
+          "matched_confirmation_delay_ms": []
+        },
+        "2": {
+          "saved_candidates": 5,
+          "tp": 0,
+          "fp": 5,
+          "fn": 2,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "matched_confirmation_delay_ms": []
+        }
+      },
+      "tracks": [
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.6576,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.6352,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.5624,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "crack",
+          "confidence": 0.4595,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3698,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3091,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2647,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2513,
+          "first_seen_ms": 250.0,
+          "last_seen_ms": 750.0,
+          "sightings": 3,
+          "second_seen_ms": 500.0,
+          "evidence_frame_index": 1,
+          "snapshot_url": null
+        }
+      ]
+    },
+    {
+      "case": "clean_replay",
+      "sampled_frames": 4,
+      "frame_detections": 24,
+      "policies_by_minimum_sightings": {
+        "1": {
+          "saved_candidates": 9,
+          "tp": 0,
+          "fp": 9,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0,
+          "matched_confirmation_delay_ms": []
+        },
+        "2": {
+          "saved_candidates": 5,
+          "tp": 0,
+          "fp": 5,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": null,
+          "f1": 0.0,
+          "matched_confirmation_delay_ms": []
+        }
+      },
+      "tracks": [
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.7348,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.706,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.6318,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.4705,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3839,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.3154,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2679,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2671,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 0.0,
+          "sightings": 1,
+          "second_seen_ms": null,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        },
+        {
+          "defect_class": "efflorescence",
+          "confidence": 0.2623,
+          "first_seen_ms": 0.0,
+          "last_seen_ms": 750.0,
+          "sightings": 4,
+          "second_seen_ms": 250.0,
+          "evidence_frame_index": 0,
+          "snapshot_url": null
+        }
+      ]
+    }
+  ]
+}

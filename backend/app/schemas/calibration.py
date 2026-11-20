@@ -158,6 +158,7 @@ class MappingResultItem(BaseModel):
     hit_distance_m: float | None = None
     was_deduplicated: bool = False
     defect_id: str | None = None
+    mapping_error: str | None = None
 
 
 class AutoMappingResult(BaseModel):

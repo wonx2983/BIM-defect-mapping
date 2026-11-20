@@ -1,39 +1,28 @@
-from app.services.inspections import record_inspection
-from app.services.uploads import stream_upload, project_directory, upload_url
-from app.services.video_results import save_result, get_result
-from app.services.runtime import run_blocking
-from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
-"""Video detection endpoints — upload videos, connect RTSP streams, process frames.
+"""Upload inspection videos or analyze bounded RTSP batches."""
 
-Endpoints:
-    POST /api/v1/video/upload         — Upload video file → process → return results + annotated video
-    POST /api/v1/video/stream/start   — Start RTSP stream processing (returns SSE events)
-    GET  /api/v1/video/results/{id}   — Get cached results for a processed video
-    GET  /api/v1/video/download/{id}  — Download annotated video file
-"""
-
-import asyncio
-import logging
+import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
-from app.core.config import get_settings
+from app.core.exceptions import ValidationError
 from app.db.session import get_db
 from app.models.defect import Defect, DefectClass, DefectStatus, SeverityLevel
 from app.models.user import User
-from app.services.ml_service import get_detector, save_uploaded_file
-
-logger = logging.getLogger(__name__)
+from app.services.access import project_access
+from app.services.inspections import record_inspection
+from app.services.ml_service import get_detector
+from app.services.runtime import run_blocking
+from app.services.uploads import stream_upload, project_directory, upload_url
+from app.services.video_results import save_result, get_result
+from ml.inference.video_processor import process_video_file, VideoProcessingResult
+from ml.inference.video_tracks import FrameDetection
 
 router = APIRouter(prefix="/api/v1/video", tags=["Video Detection"])
-
-# In-memory cache for video processing results (production would use Redis)
-
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".wmv"}
 MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500MB
@@ -44,7 +33,6 @@ def _validate_video_file(file: UploadFile) -> None:
     if file.filename:
         ext = Path(file.filename).suffix.lower()
         if ext not in ALLOWED_VIDEO_EXTENSIONS:
-            from app.core.exceptions import ValidationError
             raise ValidationError(
                 f"Unsupported video type '{ext}'. Allowed: {', '.join(ALLOWED_VIDEO_EXTENSIONS)}"
             )
@@ -55,6 +43,8 @@ async def upload_and_process_video(
     file: UploadFile = File(..., description="Video file (MP4, AVI, MOV, etc.)"),
     project_id: str = Form(..., description="Project UUID to associate defects with"),
     frame_skip: int = Form(default=10, ge=1, le=300, description="Process every Nth frame (higher = faster, lower = more thorough)"),
+    fixed_camera: bool = Form(default=False, description="Group repeat sightings in stationary footage"),
+    confirm_repeats: bool = Form(default=False, description="Require sightings in two sampled frames before saving a candidate"),
     auto_save: bool = Form(default=True, description="Auto-save detected defects to project"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
@@ -62,24 +52,19 @@ async def upload_and_process_video(
     """Upload a video file, process it frame-by-frame with YOLOv11, and return results.
 
     The video is analyzed by sampling every Nth frame (default: every 10th).
-    Duplicate defects across frames are merged using IoU overlap.
+    Stationary footage can opt in to grouping nearby sightings in image space.
     An annotated output video with bounding boxes is generated.
     """
     await project_access(project_id, user, db)
     _validate_video_file(file)
-
-    settings = get_settings()
-    backend_root = Path(__file__).resolve().parents[3]
+    if confirm_repeats and not fixed_camera:
+        raise ValidationError("Repeat confirmation requires a fixed camera")
 
     video_path, _ = await stream_upload(file, project_id, "videos", MAX_VIDEO_SIZE, ALLOWED_VIDEO_EXTENSIONS)
     output_dir = project_directory(project_id, "videos/annotated")
 
-    # Process video in a thread to avoid blocking the event loop
-    await project_access(project_id, user, db)
     detector = get_detector()
 
-    from ml.inference.video_processor import process_video_file
-    loop = asyncio.get_event_loop()
     result = await run_blocking(
         lambda: process_video_file(
             video_path=str(video_path),
@@ -87,6 +72,8 @@ async def upload_and_process_video(
             frame_skip=frame_skip,
             output_dir=str(output_dir),
             generate_annotated=True,
+            fixed_camera=fixed_camera,
+            minimum_sightings=2 if confirm_repeats else 1,
         ),
     )
 
@@ -102,22 +89,33 @@ async def upload_and_process_video(
         response_data["download_url"] = f"/api/v1/video/download/{result_id}"
 
     inspection_id = record_inspection(db, project_id, user.id, "Video inspection") if auto_save else None
-    saved_defects = []
+    saved_count = 0
     if auto_save:
-        for fd in result.frame_detections:
-            for det in fd.detections:
-                defect = Defect(id=uuid.uuid4(), project_id=uuid.UUID(project_id), inspection_id=inspection_id,
-                    defect_class=DefectClass(det.defect_class), severity=SeverityLevel(det.severity),
-                    severity_score=det.severity_score, confidence=det.confidence, bbox=det.bbox,
-                    source_image_url=getattr(fd, "snapshot_url", upload_url(video_path)),
-                    status=DefectStatus.DETECTED, created_by_id=user.id,
-                    notes=f"Video observation at {fd.timestamp_ms/1000:.1f}s; physical identity unverified")
-                db.add(defect)
-                saved_defects.append(str(defect.id))
+        if result.tracks is None:
+            observations = [
+                (frame, det, f"Video observation at {frame.timestamp_ms / 1000:.1f}s")
+                for frame in result.frame_detections for det in frame.detections
+            ]
+        else:
+            observations = [
+                (track.best_frame, track.best_detection,
+                 f"Fixed-camera video group: {track.sightings} sightings, "
+                 f"{track.first_seen_ms / 1000:.1f}–{track.last_seen_ms / 1000:.1f}s")
+                for track in result.review_tracks
+            ]
+        for frame, det, notes in observations:
+            defect = Defect(id=uuid.uuid4(), project_id=uuid.UUID(project_id), inspection_id=inspection_id,
+                defect_class=DefectClass(det.defect_class), severity=SeverityLevel(det.severity),
+                severity_score=det.severity_score, confidence=det.confidence, bbox=det.bbox,
+                source_image_url=frame.snapshot_url or upload_url(video_path),
+                status=DefectStatus.DETECTED, created_by_id=user.id,
+                notes=f"{notes}. Physical identity unverified.")
+            db.add(defect)
+        saved_count = len(observations)
         await db.flush()
 
     response_data["result_id"] = result_id
-    response_data["saved_defect_count"] = len(saved_defects)
+    response_data["saved_defect_count"] = saved_count
     response_data["source_video_url"] = upload_url(video_path)
 
     save_result(result_id, project_id, response_data, result.annotated_video_path)
@@ -180,38 +178,27 @@ async def analyze_rtsp_stream(
     await project_access(project_id, user, db)
     detector = get_detector()
 
-    from ml.inference.video_processor import process_rtsp_frames, VideoProcessingResult, FrameDetection
+    from ml.inference.video_processor import process_rtsp_frames
 
-    loop = asyncio.get_event_loop()
-
-    # Run RTSP processing in executor
     def _process():
-        result = VideoProcessingResult(fps=0, duration_seconds=0)
-        try:
-            for frame_idx, inference, annotated in process_rtsp_frames(
-                rtsp_url=rtsp_url,
-                detector=detector,
-                frame_skip=frame_skip,
-                max_frames=max_frames,
-            ):
-                fd = FrameDetection(
-                    frame_index=frame_idx,
-                    timestamp_ms=0,
-                    detections=inference.detections,
-                    inference_time_ms=inference.inference_time_ms,
-                )
-                result.frame_detections.append(fd)
-                result.processed_frames += 1
-                result.total_detections += len(inference.detections)
-
-                for det in inference.detections:
-                    result.severity_summary[det.severity] = result.severity_summary.get(det.severity, 0) + 1
-                    result.class_summary[det.defect_class] = result.class_summary.get(det.defect_class, 0) + 1
-        except Exception as e:
-            raise
-
-        from ml.inference.video_processor import _deduplicate_detections
-        result.unique_defects = result.total_detections
+        result = VideoProcessingResult()
+        started = time.monotonic()
+        for frame_idx, inference, _ in process_rtsp_frames(rtsp_url, detector, frame_skip, max_frames):
+            frame = FrameDetection(
+                frame_index=frame_idx,
+                timestamp_ms=(time.monotonic() - started) * 1000,
+                detections=inference.detections,
+                inference_time_ms=inference.inference_time_ms,
+            )
+            result.frame_detections.append(frame)
+            result.processed_frames += 1
+            result.total_frames = frame_idx + 1
+            result.total_detections += len(frame.detections)
+            for det in frame.detections:
+                result.severity_summary[det.severity] += 1
+                result.class_summary[det.defect_class] = result.class_summary.get(det.defect_class, 0) + 1
+        result.processing_time_seconds = time.monotonic() - started
+        result.finish(fixed_camera=False)
         return result
 
     result = await run_blocking(_process)

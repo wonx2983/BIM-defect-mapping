@@ -7,29 +7,19 @@ Supports three modes:
 """
 
 import logging
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Generator
 
 import cv2
 import numpy as np
 from PIL import Image
 
-from ml.inference.detector import DefectDetector, InferenceResult, DetectionResult
+from ml.inference.detector import DetectionResult
+from ml.inference.video_tracks import TRACK_MAX_GAP_MS, FrameDetection, VideoTrack, associate_fixed_camera
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class FrameDetection:
-    """Detection results for a single video frame."""
-    frame_index: int
-    timestamp_ms: float
-    detections: list[DetectionResult]
-    inference_time_ms: float
 
 
 @dataclass
@@ -46,10 +36,29 @@ class VideoProcessingResult:
     severity_summary: dict = field(default_factory=lambda: {"low": 0, "medium": 0, "high": 0, "critical": 0})
     class_summary: dict = field(default_factory=dict)
     annotated_video_path: str | None = None
+    tracks: list[VideoTrack] | None = None
+    minimum_sightings: int = 1
+
+    def finish(self, fixed_camera: bool) -> None:
+        if fixed_camera:
+            self.tracks = associate_fixed_camera(self.frame_detections)
+        else:
+            self.tracks = None
+        self.unique_defects = len(self.review_tracks) if self.tracks is not None else self.total_detections
+
+    @property
+    def review_tracks(self) -> list[VideoTrack]:
+        return [track for track in self.tracks or [] if track.sightings >= self.minimum_sightings]
 
     def to_dict(self) -> dict:
         return {
-            "counting_mode": "observations",
+            "counting_mode": "fixed_camera_tracks" if self.tracks is not None else "observations",
+            "tracks": [
+                {**track.summary(), "eligible_for_review": track.sightings >= self.minimum_sightings}
+                for track in self.tracks or []
+            ],
+            "minimum_sightings": self.minimum_sightings,
+            "unconfirmed_groups": len(self.tracks) - self.unique_defects if self.tracks is not None else 0,
             "total_frames": self.total_frames,
             "processed_frames": self.processed_frames,
             "total_detections": self.total_detections,
@@ -65,7 +74,7 @@ class VideoProcessingResult:
                     "frame_index": fd.frame_index,
                     "timestamp_ms": round(fd.timestamp_ms, 1),
                     "detection_count": len(fd.detections),
-                    "snapshot_url": getattr(fd, 'snapshot_url', None),
+                    "snapshot_url": fd.snapshot_url,
                     "detections": [
                         {
                             "defect_class": d.defect_class,
@@ -113,44 +122,17 @@ def _draw_boxes_on_frame(frame: np.ndarray, detections: list[DetectionResult]) -
     return annotated
 
 
-def _iou(box1: dict, box2: dict) -> float:
-    """Compute IoU between two bbox_pixels dicts."""
-    x1 = max(box1["x1"], box2["x1"])
-    y1 = max(box1["y1"], box2["y1"])
-    x2 = min(box1["x2"], box2["x2"])
-    y2 = min(box1["y2"], box2["y2"])
-    inter = max(0, x2 - x1) * max(0, y2 - y1)
-    area1 = (box1["x2"] - box1["x1"]) * (box1["y2"] - box1["y1"])
-    area2 = (box2["x2"] - box2["x1"]) * (box2["y2"] - box2["y1"])
-    union = area1 + area2 - inter
-    return inter / union if union > 0 else 0
-
-
-def _deduplicate_detections(all_frame_detections: list[FrameDetection], iou_threshold: float = 0.5) -> int:
-    """Count unique defects across frames by merging overlapping boxes of the same class."""
-    seen: list[tuple[str, dict]] = []  # (class, bbox_pixels) of unique defects
-
-    for fd in all_frame_detections:
-        for det in fd.detections:
-            is_duplicate = False
-            for seen_class, seen_box in seen:
-                if det.defect_class == seen_class and _iou(det.bbox_pixels, seen_box) > iou_threshold:
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
-                seen.append((det.defect_class, det.bbox_pixels))
-
-    return len(seen)
-
-
-def process_video_file(video_path, detector, frame_skip=10, output_dir=None, generate_annotated=True):
+def process_video_file(video_path, detector, frame_skip=10, output_dir=None,
+                       generate_annotated=True, fixed_camera=False, minimum_sightings=1):
     from app.core.exceptions import ValidationError
     from app.services.uploads import upload_url
     if not 1 <= frame_skip <= 300:
         raise ValidationError("frame_skip must be between 1 and 300")
+    if minimum_sightings < 1 or (minimum_sightings > 1 and not fixed_camera):
+        raise ValidationError("Repeat confirmation requires a fixed camera")
     cap = cv2.VideoCapture(video_path)
     writer = None
-    result = VideoProcessingResult()
+    result = VideoProcessingResult(minimum_sightings=minimum_sightings)
     started = time.monotonic()
     try:
         if not cap.isOpened():
@@ -158,6 +140,8 @@ def process_video_file(video_path, detector, frame_skip=10, output_dir=None, gen
         fps = cap.get(cv2.CAP_PROP_FPS)
         if not np.isfinite(fps) or fps <= 0:
             raise ValidationError("Invalid video frame rate")
+        if minimum_sightings > 1 and frame_skip / fps * 1000 > TRACK_MAX_GAP_MS:
+            raise ValidationError("Choose a faster sampling rate to confirm sightings within two seconds")
         width, height = int(cap.get(3)), int(cap.get(4))
         if width <= 0 or height <= 0 or width * height > 16_777_216:
             raise ValidationError("Unsupported video resolution")
@@ -200,8 +184,7 @@ def process_video_file(video_path, detector, frame_skip=10, output_dir=None, gen
             result.total_frames += 1
         if result.total_frames == 0:
             raise ValidationError("Video contains no readable frames")
-        # Screen coordinates do not establish physical identity for moving cameras.
-        result.unique_defects = result.total_detections
+        result.finish(fixed_camera)
         result.duration_seconds = result.total_frames / fps
         result.processing_time_seconds = time.monotonic() - started
         return result

@@ -38,6 +38,7 @@ export interface CameraDetectionResult {
   frames_analyzed: number;
   total_detections: number;
   mapped_count?: number;
+  unmapped_count?: number;
   unique_defects_saved?: number;
   bim_element_guid: string | null;
   bim_zone: string | null;

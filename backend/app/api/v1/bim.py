@@ -174,6 +174,7 @@ async def get_mapped_defects(
         .where(
             Defect.project_id == project_id,
             Defect.bim_element_guid.is_(None),
+            (Defect.bim_model_id.is_(None) | (Defect.bim_model_id == model_id)),
         )
         .order_by(Defect.created_at.desc())
     )

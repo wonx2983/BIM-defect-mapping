@@ -17,6 +17,8 @@ interface VideoResult {
   processed_frames: number;
   total_detections: number;
   unique_defects: number;
+  counting_mode?: "observations" | "fixed_camera_tracks";
+  unconfirmed_groups?: number;
   duration_seconds: number;
   processing_time_seconds: number;
   severity_summary: Record<string, number>;
@@ -61,6 +63,8 @@ export default function VideoDetectionPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [frameSkip, setFrameSkip] = useState(10);
+  const [fixedCamera, setFixedCamera] = useState(false);
+  const [confirmRepeats, setConfirmRepeats] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // RTSP state
@@ -131,6 +135,8 @@ export default function VideoDetectionPage() {
       formData.append('file', videoFile);
       formData.append('project_id', projectId);
       formData.append('frame_skip', String(frameSkip));
+      formData.append('fixed_camera', String(fixedCamera));
+      formData.append('confirm_repeats', String(fixedCamera && confirmRepeats));
       formData.append('auto_save', 'true');
 
       const token = localStorage.getItem('access_token');
@@ -373,6 +379,22 @@ export default function VideoDetectionPage() {
             </button>
           </div>
 
+          <label>
+            <input type="checkbox" checked={fixedCamera} disabled={isProcessing}
+              onChange={(event) => setFixedCamera(event.target.checked)} />{' '}
+            Fixed camera with no movement or zoom. Group repeat sightings and save one record per group.
+          </label>
+
+          {fixedCamera && (
+            <div>
+              <label>
+                <input type="checkbox" checked={confirmRepeats} disabled={isProcessing}
+                  onChange={(event) => setConfirmRepeats(event.target.checked)} />{' '}
+                Save groups seen in two sampled frames within two seconds. Single sightings stay in the frame gallery.
+              </label>
+            </div>
+          )}
+
           {progress && (
             <div className={styles.progressBar}>
               <Loader size={14} className="spinner" /> {progress}
@@ -512,7 +534,9 @@ export default function VideoDetectionPage() {
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
               <div className={styles.statValue}>{result.unique_defects}</div>
-              <div className={styles.statLabel}>Defect Observations</div>
+              <div className={styles.statLabel}>
+                {result.counting_mode === 'fixed_camera_tracks' ? 'Groups Ready for Review' : 'Defect Observations'}
+              </div>
             </div>
             <div className={styles.statCard}>
               <div className={styles.statValue}>{result.total_detections}</div>
@@ -565,8 +589,12 @@ export default function VideoDetectionPage() {
           {result.saved_defect_count > 0 && (
             <div className={styles.savedInfo} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <CheckCircle2 size={15} color="#2d8a5e" />
-              <span>{result.saved_defect_count} unique defect{result.saved_defect_count !== 1 ? 's' : ''} saved to project</span>
+              <span>{result.saved_defect_count} inspection record{result.saved_defect_count !== 1 ? 's' : ''} saved to project</span>
             </div>
+          )}
+
+          {!!result.unconfirmed_groups && (
+            <p>{result.unconfirmed_groups} sighting groups await a second observation. Review their frames below.</p>
           )}
 
           {/* Frame Preview Gallery — Collapsible */}
