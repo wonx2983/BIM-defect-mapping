@@ -49,6 +49,7 @@ class VideoProcessingResult:
 
     def to_dict(self) -> dict:
         return {
+            "counting_mode": "observations",
             "total_frames": self.total_frames,
             "processed_frames": self.processed_frames,
             "total_detections": self.total_detections,
@@ -58,7 +59,7 @@ class VideoProcessingResult:
             "processing_time_seconds": round(self.processing_time_seconds, 2),
             "severity_summary": self.severity_summary,
             "class_summary": self.class_summary,
-            "annotated_video_path": self.annotated_video_path,
+
             "frame_detections": [
                 {
                     "frame_index": fd.frame_index,
@@ -142,171 +143,96 @@ def _deduplicate_detections(all_frame_detections: list[FrameDetection], iou_thre
     return len(seen)
 
 
-def process_video_file(
-    video_path: str,
-    detector: DefectDetector,
-    frame_skip: int = 10,
-    output_dir: str | None = None,
-    generate_annotated: bool = True,
-) -> VideoProcessingResult:
-    """Process an uploaded video file frame-by-frame with the YOLO detector.
-
-    Args:
-        video_path: Path to the input video file.
-        detector: Loaded DefectDetector instance.
-        frame_skip: Process every Nth frame (default: every 10th frame).
-        output_dir: Directory to save annotated output video.
-        generate_annotated: Whether to generate an annotated output video.
-
-    Returns:
-        VideoProcessingResult with aggregated detections.
-    """
+def process_video_file(video_path, detector, frame_skip=10, output_dir=None, generate_annotated=True):
+    from app.core.exceptions import ValidationError
+    from app.services.uploads import upload_url
+    if not 1 <= frame_skip <= 300:
+        raise ValidationError("frame_skip must be between 1 and 300")
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError(f"Cannot open video file: {video_path}")
-
-    # Video properties
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    duration = total_frames / fps if fps > 0 else 0
-
-    logger.info(f"Processing video: {total_frames} frames, {fps:.1f} fps, {width}x{height}, {duration:.1f}s")
-
-    # Output video writer
     writer = None
-    annotated_path = None
-    if generate_annotated and output_dir:
-        annotated_path = str(Path(output_dir) / f"annotated_{uuid.uuid4().hex[:8]}.mp4")
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(annotated_path, fourcc, fps, (width, height))
-
-    result = VideoProcessingResult(
-        total_frames=total_frames,
-        fps=fps,
-        duration_seconds=duration,
-    )
-
-    start_time = time.time()
-    frame_index = 0
-    all_detections_count = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        if frame_index % frame_skip == 0:
-            # Convert BGR → RGB for PIL
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pil_image = Image.fromarray(rgb_frame)
-
-            # Run inference
-            t0 = time.time()
-            inference_result = detector.predict(pil_image)
-            inference_ms = (time.time() - t0) * 1000
-
-            frame_det = FrameDetection(
-                frame_index=frame_index,
-                timestamp_ms=frame_index / fps * 1000 if fps > 0 else 0,
-                detections=inference_result.detections,
-                inference_time_ms=inference_ms,
-            )
-
-            # Save annotated snapshot for frames with detections
-            if len(inference_result.detections) > 0 and output_dir:
-                snapshot_dir = Path(output_dir) / "snapshots"
-                snapshot_dir.mkdir(parents=True, exist_ok=True)
-                annotated_snap = _draw_boxes_on_frame(frame, inference_result.detections)
-                snap_filename = f"frame_{frame_index}_{uuid.uuid4().hex[:6]}.jpg"
-                snap_path = snapshot_dir / snap_filename
-                cv2.imwrite(str(snap_path), annotated_snap, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                # Store relative URL for serving via StaticFiles
-                frame_det.snapshot_url = f"/uploads/videos/annotated/snapshots/{snap_filename}"
-
-            result.frame_detections.append(frame_det)
-            result.processed_frames += 1
-            all_detections_count += len(inference_result.detections)
-
-            # Update severity & class summaries
-            for det in inference_result.detections:
-                result.severity_summary[det.severity] = result.severity_summary.get(det.severity, 0) + 1
-                result.class_summary[det.defect_class] = result.class_summary.get(det.defect_class, 0) + 1
-
-            # Write annotated frame
-            if writer and generate_annotated:
-                annotated_frame = _draw_boxes_on_frame(frame, inference_result.detections)
-                writer.write(annotated_frame)
-            elif writer:
-                writer.write(frame)
-        else:
-            # Write original frame for non-processed frames
-            if writer:
-                writer.write(frame)
-
-        frame_index += 1
-
-    cap.release()
-    if writer:
-        writer.release()
-
-    result.total_detections = all_detections_count
-    result.unique_defects = _deduplicate_detections(result.frame_detections)
-    result.processing_time_seconds = time.time() - start_time
-    result.annotated_video_path = annotated_path
-
-    logger.info(
-        f"Video processing complete: {result.processed_frames}/{result.total_frames} frames, "
-        f"{result.unique_defects} unique defects, {result.processing_time_seconds:.1f}s"
-    )
-
-    return result
-
-
-def process_rtsp_frames(
-    rtsp_url: str,
-    detector: DefectDetector,
-    frame_skip: int = 10,
-    max_frames: int = 300,
-) -> Generator[tuple[int, InferenceResult, np.ndarray | None], None, None]:
-    """Connect to an RTSP stream and yield inference results per sampled frame.
-
-    This is a generator — the caller consumes frames as they arrive.
-
-    Args:
-        rtsp_url: RTSP URL of the IP camera (e.g., rtsp://user:pass@ip:554/stream)
-        detector: Loaded DefectDetector instance.
-        frame_skip: Process every Nth frame.
-        max_frames: Maximum number of frames to process before stopping.
-
-    Yields:
-        (frame_index, InferenceResult, annotated_frame_bgr)
-    """
-    cap = cv2.VideoCapture(rtsp_url)
-    if not cap.isOpened():
-        raise ValueError(f"Cannot connect to RTSP stream: {rtsp_url}")
-
-    logger.info(f"Connected to RTSP stream: {rtsp_url}")
-    frame_index = 0
-    processed = 0
-
+    result = VideoProcessingResult()
+    started = time.monotonic()
     try:
-        while processed < max_frames:
+        if not cap.isOpened():
+            raise ValidationError("Video cannot be decoded")
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if not np.isfinite(fps) or fps <= 0:
+            raise ValidationError("Invalid video frame rate")
+        width, height = int(cap.get(3)), int(cap.get(4))
+        if width <= 0 or height <= 0 or width * height > 16_777_216:
+            raise ValidationError("Unsupported video resolution")
+        result.fps = fps
+        if output_dir and generate_annotated:
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            # Downloadable MP4; browser preview support depends on installed codecs.
+            result.annotated_video_path = str(Path(output_dir) / f"annotated_{uuid.uuid4().hex}.mp4")
+            writer = cv2.VideoWriter(result.annotated_video_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+            if not writer.isOpened():
+                raise ValidationError("Video encoder unavailable")
+        while True:
             ret, frame = cap.read()
             if not ret:
-                logger.warning("RTSP stream ended or lost connection")
                 break
-
-            if frame_index % frame_skip == 0:
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                pil_image = Image.fromarray(rgb_frame)
-                result = detector.predict(pil_image)
-                annotated = _draw_boxes_on_frame(frame, result.detections)
-                processed += 1
-                yield frame_index, result, annotated
-
-            frame_index += 1
+            if time.monotonic() - started > 600 or result.total_frames >= 108000:
+                raise ValidationError("Video processing limit exceeded; split the video into shorter clips")
+            index = result.total_frames
+            if index % frame_skip == 0:
+                if result.processed_frames >= 1000:
+                    raise ValidationError("At most 1000 sampled frames per upload; increase frame_skip")
+                inference = detector.predict(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+                fd = FrameDetection(index, index / fps * 1000, inference.detections, inference.inference_time_ms)
+                annotated = _draw_boxes_on_frame(frame, inference.detections)
+                if inference.detections and output_dir:
+                    path = Path(output_dir) / f"frame_{index}_{uuid.uuid4().hex}.jpg"
+                    if not cv2.imwrite(str(path), annotated):
+                        raise RuntimeError("Could not save evidence snapshot")
+                    fd.snapshot_url = upload_url(path)
+                result.frame_detections.append(fd)
+                result.processed_frames += 1
+                result.total_detections += len(inference.detections)
+                for det in inference.detections:
+                    result.severity_summary[det.severity] += 1
+                    result.class_summary[det.defect_class] = result.class_summary.get(det.defect_class, 0) + 1
+                if writer:
+                    writer.write(annotated)
+            elif writer:
+                writer.write(frame)
+            result.total_frames += 1
+        if result.total_frames == 0:
+            raise ValidationError("Video contains no readable frames")
+        # Screen coordinates do not establish physical identity for moving cameras.
+        result.unique_defects = result.total_detections
+        result.duration_seconds = result.total_frames / fps
+        result.processing_time_seconds = time.monotonic() - started
+        return result
     finally:
         cap.release()
-        logger.info(f"RTSP stream closed after {processed} processed frames")
+        if writer:
+            writer.release()
+
+
+def process_rtsp_frames(rtsp_url, detector, frame_skip=10, max_frames=100):
+    from app.services.streams import open_stream
+    from app.core.config import get_settings
+    from app.core.exceptions import AppException, ValidationError
+    if not 1 <= frame_skip <= 300 or not 1 <= max_frames <= 300:
+        raise ValidationError("Invalid sampling limits")
+    cap = open_stream(rtsp_url)
+    started = time.monotonic()
+    processed = index = 0
+    try:
+        while processed < max_frames:
+            if time.monotonic() - started > get_settings().STREAM_MAX_SECONDS:
+                raise AppException("Camera analysis exceeded its time limit", "STREAM_TIMEOUT", 504)
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                raise AppException("Camera stream disconnected", "STREAM_DISCONNECTED", 502)
+            if frame.shape[0] * frame.shape[1] > 16_777_216:
+                raise ValidationError("Camera resolution exceeds limit")
+            if index % frame_skip == 0:
+                result = detector.predict(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+                processed += 1
+                yield index, result, _draw_boxes_on_frame(frame, result.detections)
+            index += 1
+    finally:
+        cap.release()

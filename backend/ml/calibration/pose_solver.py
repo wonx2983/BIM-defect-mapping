@@ -91,6 +91,8 @@ class CameraIntrinsics:
 
         fx = (image_width / 2) / tan(fov_horizontal / 2)
         """
+        if not 1 < fov_horizontal_deg < 179 or image_width <= 0 or image_height <= 0:
+            raise ValueError("Invalid FOV or image dimensions")
         fov_rad = math.radians(fov_horizontal_deg)
         fx = (image_width / 2.0) / math.tan(fov_rad / 2.0)
         fy = fx  # square pixels assumed
@@ -143,6 +145,7 @@ def transform_object_points_to_world(
     object_points: np.ndarray,
     world_position: tuple[float, float, float],
     surface_normal: tuple[float, float, float] = (0.0, 0.0, 1.0),
+    rotation_deg: float = 0.0,
 ) -> np.ndarray:
     """Transform marker-local object points into BIM world coordinates.
 
@@ -152,7 +155,9 @@ def transform_object_points_to_world(
     """
     pos = np.array(world_position, dtype=np.float64)
     normal = np.array(surface_normal, dtype=np.float64)
-    normal = normal / (np.linalg.norm(normal) + 1e-12)
+    if not np.isfinite(normal).all() or np.linalg.norm(normal) < 1e-9:
+        raise ValueError("Marker normal must be finite and nonzero")
+    normal = normal / np.linalg.norm(normal)
 
     # Build rotation from marker-local frame (Z-up) to world frame
     z_axis = normal
@@ -167,7 +172,10 @@ def transform_object_points_to_world(
     rotation = np.column_stack([x_axis, y_axis, z_axis])  # 3×3
 
     # Transform each point: world = R * local + pos
-    world_points = (rotation @ object_points.T).T + pos
+    angle = math.radians(rotation_deg)
+    roll = np.array([[math.cos(angle), -math.sin(angle), 0],
+                     [math.sin(angle), math.cos(angle), 0], [0, 0, 1]])
+    world_points = (rotation @ roll @ object_points.T).T + pos
     return world_points.astype(np.float64)
 
 
@@ -215,8 +223,14 @@ def solve_pnp(
         logger.warning("PnP solve failed — no valid pose found")
         return PnPResult(success=False)
 
-    # Refine with Levenberg-Marquardt
-    rvec, tvec = cv2.solvePnPRefineLM(obj_pts, img_pts, K, dist, rvec, tvec)
+    # Refine only RANSAC inliers; rejected corners must not pull the fit back.
+    indices = inliers.ravel() if use_ransac and inliers is not None else np.arange(len(obj_pts))
+    if len(indices) < 4:
+        return PnPResult(success=False)
+    rvec, tvec = cv2.solvePnPRefineLM(obj_pts[indices], img_pts[indices], K, dist, rvec, tvec)
+    camera_points = (cv2.Rodrigues(rvec)[0] @ obj_pts.T).T + tvec.ravel()
+    if not np.isfinite(camera_points).all() or np.any(camera_points[:, 2] <= 0):
+        return PnPResult(success=False)
 
     # Compute rotation matrix
     R, _ = cv2.Rodrigues(rvec)

@@ -37,7 +37,8 @@ export interface CameraDetectionResult {
   camera_name: string;
   frames_analyzed: number;
   total_detections: number;
-  unique_defects_saved: number;
+  mapped_count?: number;
+  unique_defects_saved?: number;
   bim_element_guid: string | null;
   bim_zone: string | null;
   defects: Array<{
@@ -63,6 +64,7 @@ export async function createCamera(data: {
   bim_zone_label?: string;
   world_position?: { x: number; y: number; z: number };
   location_description?: string;
+  fov_horizontal_deg?: number;
   frame_skip?: number;
   auto_detect_enabled?: boolean;
   auto_detect_interval_minutes?: number;

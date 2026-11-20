@@ -1,4 +1,3 @@
-import { ScanSearch } from 'lucide-react';
 
 export default function DetectPage() {
   // This is re-exported from the full detection page

@@ -1,6 +1,6 @@
 # Automation of Mapping Quality Defects in BIM Environment (DefectSync)
 
-A professional-grade, production-ready platform for real-time concrete defect detection, severity assessment, and automated 3D BIM spatial mapping — built for construction professionals, site engineers, and quality assurance managers.
+An inspection platform under active field validation for real-time concrete defect detection, severity assessment, and automated 3D BIM spatial mapping — built for construction professionals, site engineers, and quality assurance managers.
 
 ---
 
@@ -13,7 +13,7 @@ A professional-grade, production-ready platform for real-time concrete defect de
 3. **Grade** — Severity classification on a 4-tier scale (`Low`, `Medium`, `High`, `Critical`) with dimensional pixel/physical estimation.
 4. **Spatial Auto-Map (Phase 2)** — Inverted pinhole raycasting intersects 3D BIM element geometry to autonomously map defects to exact structural element GUIDs and 3D surface coordinates $(X, Y, Z)$ using ArUco PnP calibration.
 5. **De-duplicate** — 3D Euclidean spatial filtering prevents duplicate defect logging across video frames and multi-camera overlaps.
-6. **Manage & Audit** — Full lifecycle tracking (Detected → Confirmed → Assigned → In Progress → Resolved → Verified) with audit trails and BCF export.
+6. **Manage & Audit** — Full lifecycle tracking (Detected → Confirmed → Assigned → In Progress → Resolved → Verified) with defect change history and CSV export.
 
 ---
 
@@ -208,3 +208,13 @@ python tests/test_phase2_synthetic_e2e.py
 - **3D BIM & Camera Viewer**: [http://localhost:3000/viewer](http://localhost:3000/viewer)
 - **Interactive API Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+
+
+## Hardening and deployment status
+
+See [deployment and acceptance](docs/deployment.md) for the private-media architecture,
+required schema migration, scheduled camera worker, test commands, and field acceptance
+requirements. Reports now provide CSV export and recorded defect changes; BCF export
+is not implemented. The bundled detector and heuristic severity must be validated on
+independent site data before operational reliance. Synthetic tests are not a production
+readiness certificate.

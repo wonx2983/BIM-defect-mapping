@@ -70,6 +70,8 @@ class FiducialMarker(Base):
         comment="Side length of the printed marker in metres (e.g. 0.20 for 20 cm)",
     )
 
+    rotation_deg: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+
     # Audit
     created_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(

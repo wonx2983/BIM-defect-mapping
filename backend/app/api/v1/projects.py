@@ -96,6 +96,7 @@ async def create_project(
     )
     db.add(project)
     await db.flush()
+    await db.refresh(project)
     return await _enrich_project(project, db)
 
 
@@ -141,6 +142,7 @@ async def update_project(
         setattr(project, field, value)
 
     await db.flush()
+    await db.refresh(project)
     return await _enrich_project(project, db)
 
 

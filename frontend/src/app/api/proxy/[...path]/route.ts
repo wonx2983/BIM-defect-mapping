@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:8000';
 
 /**
  * Proxies all /api/proxy/* requests to the backend.
@@ -22,7 +22,7 @@ async function handler(
   // Forward headers (except host)
   const headers = new Headers();
   request.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== 'host') {
+    if (!['host', 'content-length', 'connection'].includes(key.toLowerCase())) {
       headers.set(key, value);
     }
   });
@@ -32,7 +32,7 @@ async function handler(
       method: request.method,
       headers,
       body: request.method !== 'GET' && request.method !== 'HEAD'
-        ? await request.text()
+        ? await request.arrayBuffer()
         : undefined,
     });
 
@@ -44,7 +44,7 @@ async function handler(
       }
     });
 
-    const body = await backendRes.arrayBuffer();
+    const body = backendRes.status === 204 ? null : await backendRes.arrayBuffer();
     return new NextResponse(body, {
       status: backendRes.status,
       statusText: backendRes.statusText,

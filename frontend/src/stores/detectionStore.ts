@@ -3,9 +3,7 @@
 import { create } from 'zustand';
 import {
   detectSingleImage,
-  detectBatch,
   type DetectionResponse,
-  type DetectionItem,
   type BatchDetectionStatus,
 } from '@/lib/api/detection';
 

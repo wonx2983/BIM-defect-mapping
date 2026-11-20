@@ -1,3 +1,5 @@
+
+import { authenticatedFetch } from '@/lib/api';
 import { api } from '@/lib/api';
 
 export interface DetectionItem {
@@ -40,7 +42,7 @@ export interface DetectionConfig {
   severity_levels: string[];
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 export async function detectSingleImage(
   file: File,
@@ -54,7 +56,7 @@ export async function detectSingleImage(
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-  const res = await fetch(`${API_BASE}/api/v1/detect/image`, {
+  const res = await authenticatedFetch(`${API_BASE}/api/v1/detect/image`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -78,7 +80,7 @@ export async function detectBatch(
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-  const res = await fetch(`${API_BASE}/api/v1/detect/batch`, {
+  const res = await authenticatedFetch(`${API_BASE}/api/v1/detect/batch`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,

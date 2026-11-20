@@ -189,6 +189,9 @@ def main() -> None:
     print(f"  Val samples:   {len(val_dataset)}")
     print(f"  Classes:       {train_dataset.classes}")
 
+    if train_dataset.class_to_idx != val_dataset.class_to_idx or set(train_dataset.classes) != set(SEVERITY_CLASSES):
+        raise ValueError("Train and validation severity class mappings must match")
+
     # Handle class imbalance (critical defects are rare)
     class_counts = [0] * len(SEVERITY_CLASSES)
     for _, label in train_dataset:
@@ -229,7 +232,7 @@ def main() -> None:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             torch.save({
                 "model_state_dict": model.state_dict(),
-                "classes": SEVERITY_CLASSES,
+                "classes": train_dataset.classes,
                 "img_size": IMG_SIZE,
                 "val_accuracy": best_val_acc,
                 "epoch": epoch,

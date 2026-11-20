@@ -30,3 +30,5 @@ __all__ = [
 ]
 
 
+
+from app.models.audit import AuditEvent

@@ -18,7 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, loadUser } = useAuthStore();
+  const { loadUser } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

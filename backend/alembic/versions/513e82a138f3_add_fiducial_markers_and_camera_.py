@@ -49,7 +49,7 @@ def upgrade() -> None:
     op.add_column('cameras', sa.Column('image_height', sa.Integer(), nullable=True, comment='Frame height in pixels'))
     op.add_column('cameras', sa.Column('pose_rotation', postgresql.JSON(astext_type=sa.Text()), nullable=True, comment='3x3 rotation matrix as {matrix: [9 floats], rvec: [3 floats]}'))
     op.add_column('cameras', sa.Column('pose_translation', postgresql.JSON(astext_type=sa.Text()), nullable=True, comment='Translation vector: {x, y, z} in BIM world coords'))
-    op.add_column('cameras', sa.Column('calibration_status', sa.String(length=32), nullable=False, comment='uncalibrated | calibrating | calibrated | failed'))
+    op.add_column('cameras', sa.Column('calibration_status', sa.String(length=32), server_default='uncalibrated', nullable=False, comment='uncalibrated | calibrating | calibrated | failed'))
     op.add_column('cameras', sa.Column('calibration_error_px', sa.Float(), nullable=True, comment='Mean reprojection error in pixels from PnP solve'))
     op.add_column('cameras', sa.Column('calibrated_with_marker_id', sa.Uuid(), nullable=True))
     op.add_column('cameras', sa.Column('calibrated_at', sa.DateTime(timezone=True), nullable=True))

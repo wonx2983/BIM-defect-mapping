@@ -1,3 +1,4 @@
+from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
 """Defect management endpoints — CRUD, filtering, and status updates.
 
 Endpoints:
@@ -184,12 +185,19 @@ async def update_defect(
 
     await _verify_project_access(defect.project_id, user, db)
 
+    await assignee_access(body.assigned_to_id, user, db)
+    await model_access(body.bim_model_id, defect.project_id, db)
     update_data = body.model_dump(exclude_unset=True)
     if "status" in update_data and update_data["status"]:
         update_data["status"] = DefectStatus(update_data["status"])
     if "severity" in update_data and update_data["severity"]:
         update_data["severity"] = SeverityLevel(update_data["severity"])
 
+    if update_data.get("bim_element_guid") and not (body.bim_model_id or defect.bim_model_id):
+        from app.core.exceptions import ValidationError
+        raise ValidationError("A mapped defect requires a BIM model")
+    if "bim_element_guid" in update_data and update_data["bim_element_guid"] is None:
+        update_data.update(bim_model_id=None, world_position=None)
     for field, value in update_data.items():
         setattr(defect, field, value)
 

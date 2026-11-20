@@ -3,7 +3,8 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+import math
 
 
 # ── Fiducial Marker Schemas ──────────────────────────────────────────
@@ -34,10 +35,21 @@ class MarkerCreate(BaseModel):
     normal_x: float = Field(default=0.0, description="Surface normal X")
     normal_y: float = Field(default=0.0, description="Surface normal Y")
     normal_z: float = Field(default=1.0, description="Surface normal Z")
+    rotation_deg: float = Field(default=0, ge=-360, le=360)
     physical_size_m: float = Field(
         ..., gt=0,
         description="Side length of the printed marker in metres",
     )
+
+
+    @model_validator(mode="after")
+    def validate_geometry(self):
+        values = [self.world_x, self.world_y, self.world_z, self.normal_x, self.normal_y, self.normal_z]
+        if not all(math.isfinite(v) for v in values) or sum(v*v for v in values[3:]) < 1e-12:
+            raise ValueError("Coordinates must be finite and surface normal nonzero")
+        if not math.isfinite(self.physical_size_m):
+            raise ValueError("Marker size must be finite")
+        return self
 
 
 class MarkerUpdate(BaseModel):
@@ -51,7 +63,8 @@ class MarkerUpdate(BaseModel):
     normal_x: float | None = None
     normal_y: float | None = None
     normal_z: float | None = None
-    physical_size_m: float | None = None
+    physical_size_m: float | None = Field(default=None, gt=0)
+    rotation_deg: float | None = Field(default=None, ge=-360, le=360)
 
 
 class MarkerResponse(BaseModel):
@@ -71,6 +84,7 @@ class MarkerResponse(BaseModel):
     normal_y: float
     normal_z: float
     physical_size_m: float
+    rotation_deg: float = 0
     created_by_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
@@ -91,14 +105,14 @@ class CalibrateRequest(BaseModel):
     """Request to calibrate a camera using a fiducial marker."""
 
     fov_horizontal_deg: float | None = Field(
-        default=None,
+        default=None, gt=1, lt=179,
         description="Horizontal FOV in degrees; used to compute fx if not already set",
     )
     image_width: int | None = Field(
-        default=None, description="Override frame width (auto-detected from RTSP if None)",
+        default=None, gt=0, le=16384, description="Override frame width (auto-detected from RTSP if None)",
     )
     image_height: int | None = Field(
-        default=None, description="Override frame height (auto-detected from RTSP if None)",
+        default=None, gt=0, le=16384, description="Override frame height (auto-detected from RTSP if None)",
     )
 
 

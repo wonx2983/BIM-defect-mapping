@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { FolderKanban, ScanSearch, AlertTriangle, ClipboardList, ArrowUpRight, Box, Upload, Video } from 'lucide-react';
+import { FolderKanban, ScanSearch, AlertTriangle, ClipboardList, ArrowUpRight, Box, Video } from 'lucide-react';
 import { getDashboardStats, type DashboardStats } from '@/lib/api/dashboard';
 import styles from './dashboard.module.css';
 
@@ -100,7 +100,6 @@ export default function DashboardPage() {
     },
   ];
 
-  const hasNoData = totalDefects === 0 && stats.stats.total_projects === 0;
 
   return (
     <div className={styles.grid}>

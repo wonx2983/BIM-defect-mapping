@@ -109,58 +109,24 @@ def calibrate_camera_from_frame(
         if entry.get("aruco_dict_type", "DICT_4X4_50") == aruco_dict_type:
             registry_by_id[entry["marker_dict_id"]] = entry
 
-    matched_marker = None
-    matched_registry = None
-    for det in detected:
-        if det.marker_id in registry_by_id:
-            matched_marker = det
-            matched_registry = registry_by_id[det.marker_id]
-            break
-
-    if matched_marker is None:
-        detected_ids = [d.marker_id for d in detected]
-        registered_ids = list(registry_by_id.keys())
-        return CalibrationResult(
-            success=False,
-            detected_marker_id=detected[0].marker_id if detected else None,
-            intrinsics=intrinsics,
-            error_message=(
-                f"Detected marker(s) {detected_ids} but none match the registry "
-                f"(registered IDs: {registered_ids}). Register the marker first."
-            ),
-            image_width=w,
-            image_height=h,
-        )
-
-    logger.info("Matched marker ID %d to registry entry %s",
-                matched_marker.marker_id, matched_registry["id"])
-
-    # Step 4: Build 2D–3D correspondences
-    image_points = matched_marker.corners  # (4, 2)
-
-    # Object points: marker corners in world coordinates
-    local_corners = marker_object_points(matched_registry["physical_size_m"])
-    world_corners = transform_object_points_to_world(
-        local_corners,
-        world_position=(
-            matched_registry["world_x"],
-            matched_registry["world_y"],
-            matched_registry["world_z"],
-        ),
-        surface_normal=(
-            matched_registry.get("normal_x", 0.0),
-            matched_registry.get("normal_y", 0.0),
-            matched_registry.get("normal_z", 1.0),
-        ),
-    )
-
-    # Step 5: Solve PnP
-    pnp_result = solve_pnp(
-        image_points=image_points,
-        object_points_world=world_corners,
-        intrinsics=intrinsics,
-        use_ransac=True,
-    )
+    matches = [(det, registry_by_id[det.marker_id]) for det in detected
+               if det.marker_id in registry_by_id]
+    if len(matches) < 2:
+        return CalibrationResult(success=False, intrinsics=intrinsics,
+            image_width=w, image_height=h,
+            error_message="At least two registered markers must be visible for reliable calibration.")
+    matched_marker, matched_registry = matches[0]
+    image_points, world_points = [], []
+    for marker, entry in matches:
+        image_points.append(marker.corners)
+        world_points.append(transform_object_points_to_world(
+            marker_object_points(entry["physical_size_m"]),
+            (entry["world_x"], entry["world_y"], entry["world_z"]),
+            (entry.get("normal_x", 0), entry.get("normal_y", 0), entry.get("normal_z", 1)),
+            entry.get("rotation_deg", 0),
+        ))
+    pnp_result = solve_pnp(np.vstack(image_points), np.vstack(world_points),
+                           intrinsics, use_ransac=True)
 
     if not pnp_result.success:
         return CalibrationResult(
@@ -174,12 +140,11 @@ def calibrate_camera_from_frame(
             image_height=h,
         )
 
-    # Step 6: Validate reprojection error
-    if pnp_result.reprojection_error > 10.0:
-        logger.warning(
-            "High reprojection error: %.2f px (threshold: 10.0 px)",
-            pnp_result.reprojection_error,
-        )
+    # A converged optimizer is not necessarily a usable calibration.
+    if not np.isfinite(pnp_result.reprojection_error) or pnp_result.reprojection_error > 2.0:
+        return CalibrationResult(success=False, intrinsics=intrinsics,
+            image_width=w, image_height=h,
+            error_message="Calibration rejected: reprojection error exceeds 2 pixels.")
 
     # Step 7: Compute candidate set (if IFC path provided)
     candidate_guids: list[str] | None = None
@@ -189,7 +154,7 @@ def calibrate_camera_from_frame(
             from ml.calibration.ifc_geometry import extract_meshes_from_ifc
 
             meshes = extract_meshes_from_ifc(ifc_path)
-            fov = fov_horizontal_deg or 90.0
+            fov = float(np.degrees(2 * np.arctan(w / (2 * intrinsics.fx))))
             aspect = w / h if h > 0 else 16.0 / 9.0
 
             candidate_guids = compute_candidate_set(

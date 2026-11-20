@@ -20,7 +20,7 @@ function SeverityBar({ defectCount }: { defectCount: number }) {
 }
 
 export default function ProjectsPage() {
-  const { projects, total, isLoading, error, fetchProjects, addProject, removeProject } =
+  const { projects, isLoading, error, fetchProjects, addProject } =
     useProjectStore();
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState('');

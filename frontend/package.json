@@ -6,15 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
+    "prebuild": "node scripts/sync-ifc-assets.mjs"
   },
   "dependencies": {
-    "@thatopen/components": "^3.4.8",
-    "@thatopen/components-front": "^3.4.4",
-    "@thatopen/fragments": "^3.4.7",
-    "framer-motion": "^11.0.0",
     "lucide-react": "^1.31.0",
-    "next": "15.1.0",
+    "next": "15.5.29",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.12.0",
@@ -26,8 +25,17 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/three": "0.185.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "15.1.0",
-    "typescript": "^5.7.0"
+    "eslint-config-next": "15.5.29",
+    "typescript": "^5.7.0",
+    "@eslint/eslintrc": "3.3.1"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "overrides": {
+    "postcss": "8.5.33",
+    "brace-expansion@^1.1.7": "1.1.22"
   }
 }

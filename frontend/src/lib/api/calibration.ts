@@ -16,6 +16,7 @@ export interface FiducialMarker {
   normal_x: number;
   normal_y: number;
   normal_z: number;
+  rotation_deg?: number;
   physical_size_m: number;
   created_by_id: string;
   created_at: string;
@@ -35,6 +36,7 @@ export interface MarkerCreateData {
   normal_x?: number;
   normal_y?: number;
   normal_z?: number;
+  rotation_deg?: number;
   physical_size_m: number;
 }
 

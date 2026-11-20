@@ -53,11 +53,8 @@ app.include_router(cameras_router)
 app.include_router(markers_router)
 app.include_router(calibration_router)
 
-# Serve uploaded files as static assets (local storage mode)
-if settings.is_local_storage:
-    uploads_dir = Path(__file__).resolve().parents[1] / settings.LOCAL_UPLOAD_DIR
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+from app.api.v1.media import router as media_router
+app.include_router(media_router)
 
 
 @app.get("/health", tags=["System"])
@@ -75,3 +72,25 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+from app.api.v1.reports import router as reports_router
+app.include_router(reports_router)
+
+
+@app.get("/ready", tags=["System"])
+async def readiness():
+    from sqlalchemy import text
+    from fastapi.responses import JSONResponse
+    from app.db.session import async_session_factory
+    from app.services.ml_service import get_detector
+    from app.services.runtime import run_blocking
+    try:
+        async with async_session_factory() as db:
+            await db.execute(text("SELECT 1"))
+            revision = await db.scalar(text("SELECT version_num FROM alembic_version"))
+            if revision != "20261118_hardening":
+                return JSONResponse({"status": "not_ready", "reason": "database_migration_required"}, status_code=503)
+        await run_blocking(get_detector)
+    except Exception:
+        return JSONResponse({"status": "not_ready"}, status_code=503)
+    return {"status": "ready"}

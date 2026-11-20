@@ -1,3 +1,6 @@
+from app.services.uploads import stream_upload, upload_url
+from app.services.runtime import run_blocking
+from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
 """BIM model management endpoints — upload IFC files, list models, get mapped defects.
 
 Endpoints:
@@ -28,7 +31,7 @@ from app.schemas.defect import DefectResponse
 
 router = APIRouter(prefix="/api/v1/bim", tags=["BIM"])
 
-ALLOWED_IFC_EXTENSIONS = {".ifc", ".ifczip"}
+ALLOWED_IFC_EXTENSIONS = {".ifc"}
 
 
 @router.post("/upload", response_model=BIMModelResponse)
@@ -57,26 +60,24 @@ async def upload_bim_model(
         from app.core.exceptions import ForbiddenError
         raise ForbiddenError("Access denied to this project")
 
-    # Save file to disk
-    settings = get_settings()
-    backend_root = Path(__file__).resolve().parents[3]
-    bim_dir = backend_root / settings.LOCAL_UPLOAD_DIR / "bim"
-    bim_dir.mkdir(parents=True, exist_ok=True)
-
-    file_bytes = await file.read()
-    ext = Path(file.filename or "model.ifc").suffix.lower()
-    unique_name = f"{uuid.uuid4().hex}{ext}"
-    file_path = bim_dir / unique_name
-    file_path.write_bytes(file_bytes)
-
-    file_url = f"/{settings.LOCAL_UPLOAD_DIR}/bim/{unique_name}"
+    file_path, file_size = await stream_upload(file, proj_id, "bim", 100 * 1024 * 1024, ALLOWED_IFC_EXTENSIONS)
+    try:
+        from ml.calibration.ifc_geometry import extract_meshes_from_ifc
+        meshes = await run_blocking(extract_meshes_from_ifc, file_path)
+        if not meshes:
+            raise ValidationError("IFC contains no supported element geometry")
+    except Exception:
+        file_path.unlink(missing_ok=True)
+        raise
+    file_url = upload_url(file_path)
 
     # Create DB record
     bim_model = BIMModel(
         project_id=proj_id,
         original_filename=file.filename or "model.ifc",
         file_url=file_url,
-        file_size_bytes=len(file_bytes),
+        file_size_bytes=file_size,
+        element_count=len(meshes),
         processing_status=ProcessingStatus.READY,
         uploaded_by_id=user.id,
     )
@@ -98,6 +99,7 @@ async def list_bim_models(
         .where(BIMModel.project_id == project_id)
         .order_by(BIMModel.created_at.desc())
     )
+    await project_access(project_id, user, db)
     models = result.scalars().all()
     return BIMModelListResponse(
         models=[BIMModelResponse.model_validate(m) for m in models],
@@ -116,6 +118,7 @@ async def get_bim_model(
     model = result.scalar_one_or_none()
     if not model:
         raise NotFoundError("BIM model not found")
+    await project_access(model.project_id, user, db)
     return BIMModelResponse.model_validate(model)
 
 
@@ -130,6 +133,15 @@ async def delete_bim_model(
     model = result.scalar_one_or_none()
     if not model:
         raise NotFoundError("BIM model not found")
+    await project_access(model.project_id, user, db)
+    from app.models.camera import Camera
+    from app.models.fiducial_marker import FiducialMarker
+    from sqlalchemy import update
+    for camera in (await db.scalars(select(Camera).where(Camera.bim_model_id == model_id))).all():
+        invalidate_calibration(camera)
+        camera.bim_model_id = None
+    await db.execute(update(FiducialMarker).where(FiducialMarker.bim_model_id == model_id).values(bim_model_id=None))
+    await db.execute(update(Defect).where(Defect.bim_model_id == model_id).values(bim_model_id=None, bim_element_guid=None, world_position=None))
     await db.delete(model)
     await db.flush()
 
@@ -137,18 +149,23 @@ async def delete_bim_model(
 @router.get("/{project_id}/defects-mapped")
 async def get_mapped_defects(
     project_id: uuid.UUID,
+    model_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
-    """Get all defects that have BIM element mappings for 3D visualization."""
+    """Get defects scoped to a selected BIM version."""
+    await project_access(project_id, user, db)
+    await model_access(model_id, project_id, db)
     result = await db.execute(
         select(Defect)
         .where(
             Defect.project_id == project_id,
             Defect.bim_element_guid.isnot(None),
+            Defect.bim_model_id == model_id,
         )
         .order_by(Defect.created_at.desc())
     )
+    await project_access(project_id, user, db)
     defects = result.scalars().all()
 
     # Also get unmapped defects for the sidebar

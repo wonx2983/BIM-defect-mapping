@@ -1,3 +1,4 @@
+from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
 """Fiducial marker registry endpoints — CRUD for ArUco markers at known BIM coordinates.
 
 Endpoints:
@@ -89,6 +90,7 @@ async def create_marker(
             f"is already registered in this project"
         )
 
+    await model_access(body.bim_model_id, body.project_id, db)
     marker = FiducialMarker(
         project_id=body.project_id,
         marker_dict_id=body.marker_dict_id,
@@ -103,6 +105,7 @@ async def create_marker(
         normal_y=body.normal_y,
         normal_z=body.normal_z,
         physical_size_m=body.physical_size_m,
+        rotation_deg=body.rotation_deg,
         created_by_id=user.id,
     )
     db.add(marker)
@@ -153,9 +156,18 @@ async def update_marker(
     await _verify_project_access(marker.project_id, user, db)
 
     update_data = body.model_dump(exclude_unset=True)
+    # Validate the merged record, including zero normals, NaN, and null updates.
+    from pydantic import ValidationError as SchemaError
+    from app.core.exceptions import ValidationError
+    current = {name: getattr(marker, name) for name in MarkerCreate.model_fields}
+    try:
+        MarkerCreate.model_validate({**current, **update_data})
+    except SchemaError as exc:
+        raise ValidationError("Invalid marker coordinates, orientation, or size") from exc
     for field, value in update_data.items():
         setattr(marker, field, value)
 
+    await _invalidate_project_cameras(marker.project_id, db)
     await db.flush()
     await db.refresh(marker)
     return MarkerResponse.model_validate(marker)
@@ -176,5 +188,13 @@ async def delete_marker(
         raise NotFoundError("Fiducial marker not found")
 
     await _verify_project_access(marker.project_id, user, db)
+    await _invalidate_project_cameras(marker.project_id, db)
     await db.delete(marker)
     await db.flush()
+
+
+async def _invalidate_project_cameras(project_id, db):
+    from app.models.camera import Camera
+    for camera in (await db.scalars(select(Camera).where(Camera.project_id == project_id))).all():
+        invalidate_calibration(camera)
+        camera.calibrated_with_marker_id = None

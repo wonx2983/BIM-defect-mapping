@@ -125,20 +125,13 @@ def grab_frame_from_rtsp(rtsp_url: str, timeout_sec: float = 10.0) -> np.ndarray
     Raises:
         RuntimeError: If the stream cannot be opened or no frame is received.
     """
-    cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open RTSP stream: {rtsp_url}")
-
-    cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, int(timeout_sec * 1000))
-
-    # Read a few frames to skip initial buffered/stale frames.
-    for _ in range(5):
+    from app.services.streams import open_stream
+    from app.core.exceptions import AppException
+    cap = open_stream(rtsp_url)
+    try:
         ret, frame = cap.read()
-
-    cap.release()
-
-    if not ret or frame is None:
-        raise RuntimeError(f"No frame received from RTSP stream: {rtsp_url}")
-
-    logger.info("Grabbed frame from RTSP: %s, shape=%s", rtsp_url, frame.shape)
-    return frame
+        if not ret or frame is None:
+            raise AppException("No camera frame received", "CAMERA_UNAVAILABLE", 502)
+        return frame
+    finally:
+        cap.release()

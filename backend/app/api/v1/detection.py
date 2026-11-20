@@ -1,3 +1,7 @@
+from app.services.inspections import record_inspection
+from app.services.uploads import read_bounded
+import base64
+from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
 """Detection API endpoints — upload images and detect construction defects.
 
 Endpoints:
@@ -65,28 +69,25 @@ async def detect_single_image(
     If auto_save is True, detected defects are automatically saved
     to the specified project's defect database.
     """
+    await project_access(project_id, user, db)
     _validate_image_file(file)
 
     # Read image bytes
-    image_bytes = await file.read()
+    image_bytes = await read_bounded(file, MAX_FILE_SIZE)
     if len(image_bytes) > MAX_FILE_SIZE:
         from app.core.exceptions import ValidationError
         raise ValidationError(f"File too large. Maximum size: {MAX_FILE_SIZE // (1024 * 1024)}MB")
 
-    # Save original image
-    source_url = await save_uploaded_file(
-        image_bytes, file.filename or "upload.jpg", subfolder="inspections"
-    )
-
-    # Run detection + annotation
     result, annotated_bytes = await run_inference_and_annotate(image_bytes)
+    source_url = ""
+    annotated_url = "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode()
+    if auto_save:
+        source_url = await save_uploaded_file(image_bytes, file.filename or "upload.jpg",
+                                              project_id=project_id)
+        annotated_url = await save_uploaded_file(annotated_bytes, "annotated.jpg",
+                                                 subfolder="annotated", project_id=project_id)
 
-    # Save annotated image
-    annotated_url = await save_uploaded_file(
-        annotated_bytes,
-        f"annotated_{file.filename or 'result.jpg'}",
-        subfolder="annotated",
-    )
+    inspection_id = record_inspection(db, project_id, user.id, "Image inspection") if auto_save else None
 
     # Auto-save defects to database
     if auto_save and result.detections:
@@ -94,6 +95,7 @@ async def detect_single_image(
         for det in result.detections:
             defect = Defect(
                 project_id=proj_uuid,
+                inspection_id=inspection_id,
                 defect_class=DefectClass(det.defect_class),
                 severity=SeverityLevel(det.severity),
                 severity_score=det.severity_score,
@@ -135,32 +137,38 @@ async def detect_batch(
 
     Returns a summary of all detections across all images.
     """
+    await project_access(project_id, user, db)
+    if len(files) > 20:
+        from app.core.exceptions import ValidationError
+        raise ValidationError("At most 20 images per batch")
+    inspection_id = record_inspection(db, project_id, user.id, "Batch image inspection")
     total_defects = 0
     severity_summary = {"low": 0, "medium": 0, "high": 0, "critical": 0}
     proj_uuid = uuid.UUID(project_id)
 
     for file in files:
         _validate_image_file(file)
-        image_bytes = await file.read()
+        image_bytes = await read_bounded(file, MAX_FILE_SIZE)
 
         if len(image_bytes) > MAX_FILE_SIZE:
             continue  # Skip oversized files
 
         source_url = await save_uploaded_file(
-            image_bytes, file.filename or "upload.jpg", subfolder="inspections"
+            image_bytes, file.filename or "upload.jpg", subfolder="inspections", project_id=project_id
         )
 
         result, annotated_bytes = await run_inference_and_annotate(image_bytes)
 
         annotated_url = await save_uploaded_file(
             annotated_bytes,
-            f"annotated_{file.filename or 'result.jpg'}",
-            subfolder="annotated",
+            "annotated.jpg",
+            subfolder="annotated", project_id=project_id,
         )
 
         for det in result.detections:
             defect = Defect(
                 project_id=proj_uuid,
+                inspection_id=inspection_id,
                 defect_class=DefectClass(det.defect_class),
                 severity=SeverityLevel(det.severity),
                 severity_score=det.severity_score,

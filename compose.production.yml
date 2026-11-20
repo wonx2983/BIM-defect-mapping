@@ -1,0 +1,41 @@
+services:
+  backend:
+    build: ./backend
+    env_file: .env.production
+    environment:
+      APP_ENV: production
+      STORAGE_BACKEND: local
+      LOCAL_UPLOAD_DIR: /data/uploads
+    volumes:
+      - inspection-data:/data/uploads
+    restart: unless-stopped
+    expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  scheduler:
+    build: ./backend
+    command: ["python", "-m", "app.services.scheduler"]
+    env_file: .env.production
+    environment:
+      APP_ENV: production
+      STORAGE_BACKEND: local
+      LOCAL_UPLOAD_DIR: /data/uploads
+      SCHEDULER_ENABLED: "true"
+    volumes:
+      - inspection-data:/data/uploads
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      backend:
+        condition: service_healthy
+volumes:
+  inspection-data:

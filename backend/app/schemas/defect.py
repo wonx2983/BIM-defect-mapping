@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
+from typing import Literal
 
 
 class DefectResponse(BaseModel):
@@ -12,6 +13,7 @@ class DefectResponse(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     inspection_id: uuid.UUID | None
+    bim_model_id: uuid.UUID | None = None
     bim_element_guid: str | None
     defect_class: str
     severity: str
@@ -36,10 +38,11 @@ class DefectResponse(BaseModel):
 class DefectUpdate(BaseModel):
     """Update defect fields (all optional)."""
 
-    status: str | None = None
+    status: Literal["detected", "confirmed", "assigned", "in_progress", "resolved", "verified"] | None = None
     assigned_to_id: uuid.UUID | None = None
     notes: str | None = None
-    severity: str | None = None
+    severity: Literal["low", "medium", "high", "critical"] | None = None
+    bim_model_id: uuid.UUID | None = None
     bim_element_guid: str | None = None
     world_position: dict | None = None
 

@@ -1,0 +1,12 @@
+.env*
+.test*
+.auditdeps
+__pycache__
+.pytest_cache
+uploads
+ml/runs*
+ml/data
+venv
+.venv
+tests
+test_*

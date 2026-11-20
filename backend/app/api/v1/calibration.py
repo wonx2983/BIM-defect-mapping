@@ -1,3 +1,6 @@
+from app.services.inspections import record_inspection
+from app.services.runtime import run_blocking
+from app.services.access import project_access, model_access, assignee_access, invalidate_calibration
 """Camera calibration endpoints — PnP calibration and auto-mapping trigger.
 
 Endpoints:
@@ -21,7 +24,7 @@ from app.api.deps import get_current_active_user
 from app.core.exceptions import NotFoundError, ForbiddenError
 from app.db.session import get_db
 from app.models.bim_model import BIMModel
-from app.models.camera import Camera
+from app.models.camera import Camera, CameraStatus
 from app.models.defect import Defect, DefectClass, DefectStatus, SeverityLevel
 from app.models.fiducial_marker import FiducialMarker
 from app.models.project import Project
@@ -51,13 +54,12 @@ def _get_ifc_path(bim_model: BIMModel) -> Path | None:
     """Resolve the IFC file path on disk from a BIM model record."""
     if not bim_model or not bim_model.file_url:
         return None
-    backend_root = Path(__file__).resolve().parents[3]
-    # file_url is like "/uploads/bim/abc123.ifc"
-    relative = bim_model.file_url.lstrip("/")
-    full_path = backend_root / relative
-    if full_path.exists():
-        return full_path
-    return None
+    from app.services.uploads import upload_root
+    if not bim_model.file_url.startswith("/uploads/"):
+        return None
+    root = upload_root()
+    full_path = (root / bim_model.file_url.removeprefix("/uploads/")).resolve()
+    return full_path if full_path.is_relative_to(root) and full_path.is_file() else None
 
 
 @router.post("/{camera_id}/calibrate", response_model=CalibrationResultSchema)
@@ -78,27 +80,30 @@ async def calibrate_camera(
     camera = result.scalar_one_or_none()
     if not camera:
         raise NotFoundError("Camera not found")
+    await project_access(camera.project_id, user, db)
 
     await _verify_project_access(camera.project_id, user, db)
 
     # Mark as calibrating
+    invalidate_calibration(camera)
     camera.calibration_status = "calibrating"
     await db.flush()
 
     # Load marker registry for this project
     markers_result = await db.execute(
-        select(FiducialMarker).where(FiducialMarker.project_id == camera.project_id)
+        select(FiducialMarker).where(FiducialMarker.project_id == camera.project_id,
+                                     FiducialMarker.bim_model_id == camera.bim_model_id)
     )
     markers = markers_result.scalars().all()
 
     if not markers:
         camera.calibration_status = "failed"
-        await db.flush()
+        await db.commit()
         return CalibrationResultSchema(
             success=False,
             calibration_status="failed",
             message="No fiducial markers registered for this project. "
-                    "Register at least one marker before calibrating.",
+                    "Register at least two markers before calibrating.",
         )
 
     marker_registry = [
@@ -113,6 +118,7 @@ async def calibrate_camera(
             "normal_y": m.normal_y,
             "normal_z": m.normal_z,
             "physical_size_m": m.physical_size_m,
+            "rotation_deg": m.rotation_deg,
         }
         for m in markers
     ]
@@ -140,7 +146,7 @@ async def calibrate_camera(
         from ml.calibration.pose_solver import CameraIntrinsics
 
         intrinsics = None
-        if camera.intrinsics:
+        if camera.intrinsics and body.fov_horizontal_deg is None:
             intrinsics = CameraIntrinsics.from_dict(camera.intrinsics)
 
         return calibrate_camera_from_rtsp(
@@ -151,7 +157,12 @@ async def calibrate_camera(
             ifc_path=str(ifc_path) if ifc_path else None,
         )
 
-    cal_result = await loop.run_in_executor(None, _run_calibration)
+    try:
+        cal_result = await run_blocking(_run_calibration)
+    except Exception:
+        camera.calibration_status = "failed"
+        await db.commit()
+        raise
 
     # Persist results
     if cal_result.success and cal_result.pnp_result:
@@ -239,6 +250,7 @@ async def get_calibration_status(
     camera = result.scalar_one_or_none()
     if not camera:
         raise NotFoundError("Camera not found")
+    await project_access(camera.project_id, user, db)
 
     return {
         "camera_id": str(camera.id),
@@ -261,7 +273,7 @@ async def get_calibration_status(
 @router.post("/{camera_id}/auto-detect", response_model=AutoMappingResult)
 async def run_auto_mapped_detection(
     camera_id: uuid.UUID,
-    max_frames: int = Query(default=50, description="Max frames to analyze"),
+    max_frames: int = Query(default=50, ge=1, le=300, description="Max frames to analyze"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_active_user),
 ):
@@ -277,6 +289,7 @@ async def run_auto_mapped_detection(
     camera = result.scalar_one_or_none()
     if not camera:
         raise NotFoundError("Camera not found")
+    await project_access(camera.project_id, user, db)
 
     await _verify_project_access(camera.project_id, user, db)
 
@@ -288,39 +301,19 @@ async def run_auto_mapped_detection(
         and camera.intrinsics is not None
     )
 
+    from app.core.exceptions import ValidationError
     if not is_calibrated:
-        # Fall back to the existing simple detection (Phase 1 behavior)
-        from app.api.v1.cameras import run_camera_detection
-        return await run_camera_detection(camera_id, max_frames, db, user)
-
-    # ── Phase 2: Calibrated auto-mapping ──────────────────────────────
-
+        raise ValidationError("Calibrate the camera before automatic BIM mapping")
+    if not camera.bim_model_id or not camera.candidate_element_guids:
+        raise ValidationError("Calibration has no visible BIM geometry; link a model and recalibrate")
     detector = get_detector()
-    loop = asyncio.get_event_loop()
-
-    # Step 1: Run YOLO detection on RTSP frames
-    def _detect():
-        from ml.inference.video_processor import process_rtsp_frames, FrameDetection
-        frame_detections = []
-        try:
-            for frame_idx, inference, annotated in process_rtsp_frames(
-                rtsp_url=camera.rtsp_url,
-                detector=detector,
-                frame_skip=camera.frame_skip,
-                max_frames=max_frames,
-            ):
-                fd = FrameDetection(
-                    frame_index=frame_idx,
-                    timestamp_ms=0,
-                    detections=inference.detections,
-                    inference_time_ms=inference.inference_time_ms,
-                )
-                frame_detections.append(fd)
-        except Exception as e:
-            logger.error(f"Camera {camera.name} RTSP error: {e}")
-        return frame_detections
-
-    frame_detections = await loop.run_in_executor(None, _detect)
+    from app.services.camera_capture import capture_observations
+    try:
+        frame_detections = await run_blocking(capture_observations, camera, detector, max_frames)
+    except Exception:
+        camera.status = CameraStatus.ERROR
+        await db.commit()
+        raise
 
     # Step 2: Load BIM geometry for raycasting
     candidate_meshes: dict = {}
@@ -340,9 +333,12 @@ async def run_auto_mapped_detection(
                     guids = set(camera.candidate_element_guids)
                     return {g: m for g, m in all_meshes.items() if g in guids}
 
-                candidate_meshes = await loop.run_in_executor(None, _load_meshes)
+                candidate_meshes = await run_blocking(_load_meshes)
         except Exception as e:
-            logger.warning("Failed to load BIM meshes for auto-mapping: %s", e)
+            raise ValidationError("BIM geometry could not be loaded") from e
+
+    if not candidate_meshes:
+        raise ValidationError("No candidate BIM geometry is available")
 
     # Step 3: Reconstruct camera pose from stored data
     from ml.calibration.pose_solver import CameraIntrinsics
@@ -354,10 +350,14 @@ async def run_auto_mapped_detection(
         camera.pose_translation["z"],
     ])
 
+    # Serialize duplicate persistence across cameras and API workers for this project.
+    await db.execute(select(Project).where(Project.id == camera.project_id).with_for_update())
+
     # Step 4: Load existing defects for de-duplication
     existing_defects_result = await db.execute(
         select(Defect).where(
             Defect.project_id == camera.project_id,
+            Defect.bim_model_id == camera.bim_model_id,
             Defect.bim_element_guid.isnot(None),
         )
     )
@@ -378,16 +378,11 @@ async def run_auto_mapped_detection(
     all_detections: list[DetectionInput] = []
     for fd in frame_detections:
         for det in fd.detections:
-            bbox = det.bbox_pixels if hasattr(det, "bbox_pixels") else det.bbox
-            # Compute pixel centroid
-            cx = bbox.get("x", 0) + bbox.get("w", 0) / 2.0
-            cy = bbox.get("y", 0) + bbox.get("h", 0) / 2.0
-
-            # If bbox is normalised, convert to pixel coords
-            if camera.image_width and camera.image_height:
-                if cx <= 1.0 and cy <= 1.0:
-                    cx *= camera.image_width
-                    cy *= camera.image_height
+            bbox = det.bbox_pixels
+            cx = (bbox["x1"] + bbox["x2"]) / 2.0
+            cy = (bbox["y1"] + bbox["y2"]) / 2.0
+            if not (0 <= cx < camera.image_width and 0 <= cy < camera.image_height):
+                raise ValidationError("Detection falls outside calibrated frame")
 
             all_detections.append(DetectionInput(
                 defect_class=det.defect_class,
@@ -398,7 +393,7 @@ async def run_auto_mapped_detection(
                 pixel_y=cy,
                 bbox=det.bbox if hasattr(det, "bbox") else bbox,
                 camera_id=str(camera.id),
-                source_image_url=f"camera://{camera.name}",
+                source_image_url=fd.snapshot_url,
             ))
 
     # Run batch mapping in executor (CPU-bound raycasting)
@@ -412,7 +407,7 @@ async def run_auto_mapped_detection(
             existing_defects=existing_defects,
         )
 
-    mapping_results = await loop.run_in_executor(None, _map) if all_detections else []
+    mapping_results = await run_blocking(_map) if all_detections else []
 
     # Step 6: Save results to DB
     result_items: list[MappingResultItem] = []
@@ -420,70 +415,50 @@ async def run_auto_mapped_detection(
     dedup_count = 0
     unmapped_count = 0
 
+    inspection_id = record_inspection(db, camera.project_id, user.id, "Calibrated camera inspection")
+    persisted = {}
     for mr in mapping_results:
         if mr.mapped_element_guid:
-            if mr.was_deduplicated and mr.existing_defect_id:
-                # Update existing defect
-                try:
-                    existing = await db.execute(
-                        select(Defect).where(Defect.id == uuid.UUID(mr.existing_defect_id))
-                    )
-                    defect = existing.scalar_one_or_none()
-                    if defect:
-                        if mr.detection.confidence > defect.confidence:
-                            defect.confidence = mr.detection.confidence
-                            defect.severity_score = mr.detection.severity_score
-                        defect.updated_at = datetime.now(timezone.utc)
-                    dedup_count += 1
-                except Exception as e:
-                    logger.warning("Failed to update existing defect: %s", e)
+            defect = persisted.get(mr.record_id)
+            if defect is None and mr.was_deduplicated:
+                defect = await db.scalar(select(Defect).where(
+                    Defect.id == uuid.UUID(mr.record_id), Defect.project_id == camera.project_id))
+                if defect is None:
+                    raise RuntimeError("Duplicate reference could not be resolved")
+            if defect is not None:
+                if mr.detection.confidence > defect.confidence:
+                    defect.confidence = mr.detection.confidence
+                    defect.severity = SeverityLevel(mr.detection.severity)
+                    defect.severity_score = mr.detection.severity_score
+                    defect.source_image_url = mr.detection.source_image_url
+                    defect.bbox = mr.detection.bbox
+                defect.updated_at = datetime.now(timezone.utc)
+                dedup_count += 1
             else:
-                # Create new defect with mapping
-                try:
-                    defect = Defect(
-                        project_id=camera.project_id,
-                        defect_class=DefectClass(mr.detection.defect_class),
-                        severity=SeverityLevel(mr.detection.severity),
-                        severity_score=mr.detection.severity_score,
-                        confidence=mr.detection.confidence,
-                        bbox=mr.detection.bbox,
-                        source_image_url=mr.detection.source_image_url,
-                        status=DefectStatus.DETECTED,
-                        created_by_id=user.id,
-                        bim_element_guid=mr.mapped_element_guid,
-                        world_position=(
-                            {"x": mr.hit_position[0], "y": mr.hit_position[1], "z": mr.hit_position[2]}
-                            if mr.hit_position else None
-                        ),
-                        notes=f"Auto-mapped from camera '{camera.name}' via PnP calibration",
-                    )
-                    db.add(defect)
-                    mapped_count += 1
-                except Exception as e:
-                    logger.warning("Failed to save mapped defect: %s", e)
-
-            result_items.append(MappingResultItem(
-                defect_class=mr.detection.defect_class,
-                confidence=round(mr.detection.confidence, 4),
-                severity=mr.detection.severity,
-                mapped_element_guid=mr.mapped_element_guid,
-                hit_position=(
-                    {"x": mr.hit_position[0], "y": mr.hit_position[1], "z": mr.hit_position[2]}
-                    if mr.hit_position else None
-                ),
-                hit_distance_m=round(mr.hit_distance_m, 3) if mr.hit_distance_m else None,
-                was_deduplicated=mr.was_deduplicated,
-                defect_id=mr.existing_defect_id,
-            ))
+                defect = Defect(id=uuid.UUID(mr.record_id), project_id=camera.project_id, inspection_id=inspection_id,
+                    bim_model_id=camera.bim_model_id,
+                    defect_class=DefectClass(mr.detection.defect_class),
+                    severity=SeverityLevel(mr.detection.severity),
+                    severity_score=mr.detection.severity_score, confidence=mr.detection.confidence,
+                    bbox=mr.detection.bbox, source_image_url=mr.detection.source_image_url,
+                    status=DefectStatus.DETECTED, created_by_id=user.id,
+                    bim_element_guid=mr.mapped_element_guid,
+                    world_position=dict(zip(("x", "y", "z"), mr.hit_position)),
+                    notes=f"Camera {camera.name}: automatic mapping requires inspection confirmation")
+                db.add(defect)
+                mapped_count += 1
+            persisted[mr.record_id] = defect
         else:
             unmapped_count += 1
-            result_items.append(MappingResultItem(
-                defect_class=mr.detection.defect_class,
-                confidence=round(mr.detection.confidence, 4),
-                severity=mr.detection.severity,
-            ))
+        result_items.append(MappingResultItem(
+            defect_class=mr.detection.defect_class, confidence=mr.detection.confidence,
+            severity=mr.detection.severity, mapped_element_guid=mr.mapped_element_guid,
+            hit_position=dict(zip(("x", "y", "z"), mr.hit_position)) if mr.hit_position else None,
+            hit_distance_m=mr.hit_distance_m, was_deduplicated=mr.was_deduplicated,
+            defect_id=mr.record_id if mr.mapped_element_guid else None))
 
     # Update camera stats
+    camera.status = CameraStatus.ACTIVE
     camera.last_detection_at = datetime.now(timezone.utc)
     camera.total_defects_found = (camera.total_defects_found or 0) + mapped_count
 

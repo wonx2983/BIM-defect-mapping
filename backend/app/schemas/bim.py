@@ -3,7 +3,8 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from app.services.streams import validate_stream_url
 
 
 # ── BIM Model Schemas ────────────────────────────────────────────────
@@ -42,13 +43,19 @@ class CameraCreate(BaseModel):
     bim_zone_label: str | None = None
     world_position: dict | None = None
     location_description: str | None = None
-    frame_skip: int = 15
+    frame_skip: int = Field(default=15, ge=1, le=300)
     auto_detect_enabled: bool = False
-    auto_detect_interval_minutes: int = 15
+    auto_detect_interval_minutes: int = Field(default=15, ge=1, le=10080)
     # Phase 2: optional intrinsics at creation time
-    fov_horizontal_deg: float | None = None
-    image_width: int | None = None
-    image_height: int | None = None
+    fov_horizontal_deg: float | None = Field(default=None, gt=1, lt=179)
+    image_width: int | None = Field(default=None, gt=0, le=16384)
+    image_height: int | None = Field(default=None, gt=0, le=16384)
+
+    @field_validator("rtsp_url")
+    @classmethod
+    def stream_url(cls, value):
+        return validate_stream_url(value) if value is not None else value
+
 
 
 class CameraUpdate(BaseModel):
@@ -60,14 +67,20 @@ class CameraUpdate(BaseModel):
     bim_zone_label: str | None = None
     world_position: dict | None = None
     location_description: str | None = None
-    frame_skip: int | None = None
+    frame_skip: int | None = Field(default=None, ge=1, le=300)
     is_active: bool | None = None
     auto_detect_enabled: bool | None = None
-    auto_detect_interval_minutes: int | None = None
+    auto_detect_interval_minutes: int | None = Field(default=None, ge=1, le=10080)
     # Phase 2: calibration fields
-    fov_horizontal_deg: float | None = None
-    image_width: int | None = None
-    image_height: int | None = None
+    fov_horizontal_deg: float | None = Field(default=None, gt=1, lt=179)
+    image_width: int | None = Field(default=None, gt=0, le=16384)
+    image_height: int | None = Field(default=None, gt=0, le=16384)
+
+    @field_validator("rtsp_url")
+    @classmethod
+    def stream_url(cls, value):
+        return validate_stream_url(value) if value is not None else value
+
 
 
 class CameraResponse(BaseModel):
@@ -93,16 +106,16 @@ class CameraResponse(BaseModel):
     updated_at: datetime
     # Phase 2: calibration data
     intrinsics: dict | None = None
-    fov_horizontal_deg: float | None = None
-    image_width: int | None = None
-    image_height: int | None = None
+    fov_horizontal_deg: float | None = Field(default=None, gt=1, lt=179)
+    image_width: int | None = Field(default=None, gt=0, le=16384)
+    image_height: int | None = Field(default=None, gt=0, le=16384)
     pose_rotation: dict | None = None
     pose_translation: dict | None = None
     calibration_status: str = "uncalibrated"
     calibration_error_px: float | None = None
     calibrated_with_marker_id: uuid.UUID | None = None
     calibrated_at: datetime | None = None
-    candidate_element_guids: dict | None = None
+    candidate_element_guids: list[str] | None = None
 
     model_config = {"from_attributes": True}
 

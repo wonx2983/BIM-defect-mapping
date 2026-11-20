@@ -89,7 +89,7 @@ def extract_meshes_from_ifc(
         raise FileNotFoundError(f"IFC file not found: {ifc_path}")
 
     # Cache lookup
-    cache_key = str(ifc_path.resolve())
+    cache_key = f"{ifc_path.resolve()}:{ifc_path.stat().st_mtime_ns}:{ifc_path.stat().st_size}:{element_types}"
     if use_cache and cache_key in _mesh_cache:
         logger.info("Using cached meshes for %s (%d elements)",
                      ifc_path.name, len(_mesh_cache[cache_key]))
@@ -162,6 +162,8 @@ def extract_meshes_from_ifc(
 
     # Cache the result
     if use_cache:
+        if len(_mesh_cache) >= 4:
+            _mesh_cache.pop(next(iter(_mesh_cache)))
         _mesh_cache[cache_key] = meshes
 
     return meshes
@@ -252,5 +254,7 @@ def clear_mesh_cache(ifc_path: str | Path | None = None) -> None:
         logger.info("Cleared entire IFC mesh cache")
     else:
         key = str(Path(ifc_path).resolve())
-        _mesh_cache.pop(key, None)
+        for cached in list(_mesh_cache):
+            if cached.startswith(key + ":"):
+                _mesh_cache.pop(cached, None)
         logger.info("Cleared IFC mesh cache for %s", ifc_path)

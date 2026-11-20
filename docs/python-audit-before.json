@@ -1,0 +1,1054 @@
+{
+  "dependencies": [
+    {
+      "name": "fastapi",
+      "version": "0.115.0",
+      "vulns": []
+    },
+    {
+      "name": "uvicorn",
+      "version": "0.30.0",
+      "vulns": []
+    },
+    {
+      "name": "sqlalchemy",
+      "version": "2.0.35",
+      "vulns": []
+    },
+    {
+      "name": "asyncpg",
+      "version": "0.30.0",
+      "vulns": []
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.4",
+      "vulns": []
+    },
+    {
+      "name": "alembic",
+      "version": "1.13.2",
+      "vulns": []
+    },
+    {
+      "name": "pydantic",
+      "version": "2.9.2",
+      "vulns": []
+    },
+    {
+      "name": "pydantic-settings",
+      "version": "2.5.2",
+      "vulns": []
+    },
+    {
+      "name": "python-jose",
+      "version": "3.3.0",
+      "vulns": [
+        {
+          "id": "PYSEC-2024-233",
+          "fix_versions": [
+            "3.4.0"
+          ],
+          "aliases": [
+            "GHSA-cjwg-qfpm-7377",
+            "CVE-2024-33664"
+          ]
+        },
+        {
+          "id": "PYSEC-2024-232",
+          "fix_versions": [
+            "3.4.0"
+          ],
+          "aliases": [
+            "CVE-2024-33663",
+            "CVE-2026-85394",
+            "GHSA-6c5p-j8vq-pqhj",
+            "GHSA-3qf3-8w2g-rqmx"
+          ]
+        },
+        {
+          "id": "PYSEC-2024-232",
+          "fix_versions": [
+            "3.4.0"
+          ],
+          "aliases": [
+            "CVE-2024-33663",
+            "GHSA-6c5p-j8vq-pqhj"
+          ]
+        },
+        {
+          "id": "PYSEC-2024-233",
+          "fix_versions": [
+            "3.4.0"
+          ],
+          "aliases": [
+            "GHSA-cjwg-qfpm-7377",
+            "CVE-2024-33664"
+          ]
+        },
+        {
+          "id": "PYSEC-2025-185",
+          "fix_versions": [],
+          "aliases": [
+            "CVE-2024-29370"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4298",
+          "fix_versions": [],
+          "aliases": [
+            "CVE-2026-85394",
+            "GHSA-3qf3-8w2g-rqmx"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "passlib",
+      "version": "1.7.4",
+      "vulns": []
+    },
+    {
+      "name": "python-multipart",
+      "version": "0.0.12",
+      "vulns": [
+        {
+          "id": "PYSEC-2026-1851",
+          "fix_versions": [
+            "0.0.18"
+          ],
+          "aliases": [
+            "CVE-2024-53981",
+            "GHSA-59g5-xgcq-4qw3"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-1852",
+          "fix_versions": [
+            "0.0.22"
+          ],
+          "aliases": [
+            "GHSA-wp53-j4wj-2cfg",
+            "CVE-2026-24486"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3038",
+          "fix_versions": [
+            "0.0.26"
+          ],
+          "aliases": [
+            "CVE-2026-40347",
+            "GHSA-mj87-hwqh-73pj"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3039",
+          "fix_versions": [
+            "0.0.27"
+          ],
+          "aliases": [
+            "CVE-2026-42561",
+            "GHSA-pp6c-gr5w-3c5g"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3040",
+          "fix_versions": [
+            "0.0.31"
+          ],
+          "aliases": [
+            "GHSA-v9pg-7xvm-68hf",
+            "CVE-2026-53540"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3036",
+          "fix_versions": [
+            "0.0.30"
+          ],
+          "aliases": [
+            "CVE-2026-53539",
+            "GHSA-5rvq-cxj2-64vf"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3037",
+          "fix_versions": [
+            "0.0.30"
+          ],
+          "aliases": [
+            "GHSA-6jv3-5f52-599m",
+            "CVE-2026-53538"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-1852",
+          "fix_versions": [
+            "0.0.22"
+          ],
+          "aliases": [
+            "GHSA-wp53-j4wj-2cfg",
+            "CVE-2026-24486"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-1851",
+          "fix_versions": [
+            "0.0.18"
+          ],
+          "aliases": [
+            "CVE-2024-53981",
+            "GHSA-59g5-xgcq-4qw3"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3038",
+          "fix_versions": [
+            "0.0.26"
+          ],
+          "aliases": [
+            "CVE-2026-40347",
+            "GHSA-mj87-hwqh-73pj"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3037",
+          "fix_versions": [
+            "0.0.30"
+          ],
+          "aliases": [
+            "GHSA-6jv3-5f52-599m",
+            "CVE-2026-53538"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3036",
+          "fix_versions": [
+            "0.0.30"
+          ],
+          "aliases": [
+            "CVE-2026-53539",
+            "GHSA-5rvq-cxj2-64vf"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3040",
+          "fix_versions": [
+            "0.0.31"
+          ],
+          "aliases": [
+            "GHSA-v9pg-7xvm-68hf",
+            "CVE-2026-53540"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3039",
+          "fix_versions": [
+            "0.0.27"
+          ],
+          "aliases": [
+            "CVE-2026-42561",
+            "GHSA-pp6c-gr5w-3c5g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "boto3",
+      "version": "1.35.0",
+      "vulns": []
+    },
+    {
+      "name": "redis",
+      "version": "5.1.0",
+      "vulns": []
+    },
+    {
+      "name": "celery",
+      "version": "5.4.0",
+      "vulns": []
+    },
+    {
+      "name": "ultralytics",
+      "version": "8.3.0",
+      "vulns": []
+    },
+    {
+      "name": "torch",
+      "skip_reason": "Dependency not found on PyPI and could not be audited: torch (2.5.1+cu121)"
+    },
+    {
+      "name": "torchvision",
+      "skip_reason": "Dependency not found on PyPI and could not be audited: torchvision (0.20.1+cu121)"
+    },
+    {
+      "name": "pillow",
+      "version": "10.4.0",
+      "vulns": [
+        {
+          "id": "PYSEC-2026-2249",
+          "fix_versions": [
+            "12.1.1"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-25990",
+            "GHSA-cfh3-3jmp-rvhc",
+            "CVE-2026-25990"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2250",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "GHSA-whj4-6x5x-4v2j",
+            "CVE-2026-40192",
+            "BIT-pillow-2026-40192"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-165",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "CVE-2026-42308",
+            "GHSA-wjx4-4jcj-g98j",
+            "BIT-pillow-2026-42308"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2874",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "GHSA-r73j-pqj5-w3x7",
+            "BIT-pillow-2026-42310",
+            "CVE-2026-42310"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2252",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-42311",
+            "GHSA-pwv6-vv43-88gr",
+            "CVE-2026-42311"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-165",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "CVE-2026-42308",
+            "GHSA-wjx4-4jcj-g98j"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2250",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "GHSA-whj4-6x5x-4v2j",
+            "CVE-2026-40192"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2253",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-8v84-f9pq-wr9x",
+            "BIT-pillow-2026-54059",
+            "CVE-2026-54059"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2255",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-45hq-cxwh-f6vc",
+            "BIT-pillow-2026-55379",
+            "CVE-2026-55379"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2257",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-55798",
+            "GHSA-4x4j-2g7c-83w6"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2256",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-55380",
+            "CVE-2026-55380",
+            "GHSA-phj9-mv4w-65pm"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2254",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-5x94-69rx-g8h2",
+            "BIT-pillow-2026-54060",
+            "CVE-2026-54060"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2252",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "GHSA-pwv6-vv43-88gr",
+            "CVE-2026-42311"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2249",
+          "fix_versions": [
+            "12.1.1"
+          ],
+          "aliases": [
+            "GHSA-cfh3-3jmp-rvhc",
+            "CVE-2026-25990"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2874",
+          "fix_versions": [
+            "12.2.0"
+          ],
+          "aliases": [
+            "GHSA-r73j-pqj5-w3x7",
+            "CVE-2026-42310"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3453",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59205",
+            "GHSA-9hw9-ch79-4vh6",
+            "BIT-pillow-2026-59205"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3451",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-59199",
+            "GHSA-6r8x-57c9-28j4",
+            "CVE-2026-59199"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3493",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-62p4-gmf7-7g93",
+            "CVE-2026-54058",
+            "BIT-pillow-2026-54058"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2254",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-5x94-69rx-g8h2",
+            "CVE-2026-54060",
+            "BIT-pillow-2026-54060"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2253",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-54059",
+            "GHSA-8v84-f9pq-wr9x",
+            "BIT-pillow-2026-54059"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2256",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-55380",
+            "CVE-2026-55380",
+            "GHSA-phj9-mv4w-65pm"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-2255",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-55379",
+            "GHSA-45hq-cxwh-f6vc",
+            "CVE-2026-55379"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3454",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-xj96-63gp-2gmr",
+            "BIT-pillow-2026-59197",
+            "CVE-2026-59197"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3451",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59199",
+            "BIT-pillow-2026-59199",
+            "GHSA-6r8x-57c9-28j4"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3494",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "BIT-pillow-2026-59198",
+            "GHSA-fj7v-r99m-22gq",
+            "CVE-2026-59198"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3495",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59200",
+            "BIT-pillow-2026-59200",
+            "GHSA-jjj6-mw9f-p565"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3496",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59204",
+            "GHSA-vjc4-5qp5-m44j",
+            "BIT-pillow-2026-59204"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3453",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59205",
+            "GHSA-9hw9-ch79-4vh6",
+            "BIT-pillow-2026-59205"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3454",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-xj96-63gp-2gmr",
+            "CVE-2026-59197"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3495",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-jjj6-mw9f-p565",
+            "CVE-2026-59200"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3496",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59204",
+            "GHSA-vjc4-5qp5-m44j"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3494",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "CVE-2026-59198",
+            "GHSA-fj7v-r99m-22gq"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-3493",
+          "fix_versions": [
+            "12.3.0"
+          ],
+          "aliases": [
+            "GHSA-62p4-gmf7-7g93",
+            "CVE-2026-54058"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4327",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-4558-3h8r-v8xp",
+            "CVE-2026-112394"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4326",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-27h8-gf7j-v5hc",
+            "CVE-2026-112392"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4340",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-4rm8-3hmm-39fg",
+            "CVE-2026-96641"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4343",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "CVE-2026-96644",
+            "GHSA-9v9v-9qvf-h2hj"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4334",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-pchr-8j38-3x4p",
+            "CVE-2026-112896"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4337",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "CVE-2026-96636",
+            "GHSA-p8hx-v2p6-rp84"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4341",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-3j72-p6qg-6xp7",
+            "CVE-2026-96642"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4330",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-5x8w-8jj5-q52h",
+            "CVE-2026-112398"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4338",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-g842-9rc4-69pw",
+            "CVE-2026-96637"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4335",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-xgh8-jp6q-p5x8",
+            "CVE-2026-112901"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4331",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "CVE-2026-112402",
+            "GHSA-7mwm-ghpf-9vrm"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4332",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-8g5g-8vmr-9782",
+            "CVE-2026-112403"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4329",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-58r4-6rv3-gfh8",
+            "CVE-2026-112397"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-4363",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-xvh5-g6gv-559v",
+            "CVE-2026-112902"
+          ]
+        },
+        {
+          "id": "CVE-2026-112895",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-p4wg-p73j-c528"
+          ]
+        },
+        {
+          "id": "CVE-2026-112400",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-65qm-jvmh-6pqg"
+          ]
+        },
+        {
+          "id": "CVE-2026-112897",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-q45j-58j2-45rg"
+          ]
+        },
+        {
+          "id": "CVE-2026-112395",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-462x-pgg6-55fp"
+          ]
+        },
+        {
+          "id": "CVE-2026-112404",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-c6hw-5grf-ff96"
+          ]
+        },
+        {
+          "id": "CVE-2026-112899",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-vx6w-vv9f-6gvg"
+          ]
+        },
+        {
+          "id": "CVE-2026-112900",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-w889-685w-c8fh"
+          ]
+        },
+        {
+          "id": "CVE-2026-112893",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-j4m9-6w36-pw47"
+          ]
+        },
+        {
+          "id": "CVE-2026-112891",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-fc9g-5qg7-mf45"
+          ]
+        },
+        {
+          "id": "CVE-2026-112390",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-22hg-r758-rrw9"
+          ]
+        },
+        {
+          "id": "CVE-2026-112401",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-74r2-7ff9-mjj2"
+          ]
+        },
+        {
+          "id": "CVE-2026-112391",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-254f-3936-288h"
+          ]
+        },
+        {
+          "id": "CVE-2026-112894",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-jg86-v3jv-hrpm"
+          ]
+        },
+        {
+          "id": "CVE-2026-112406",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-f2g6-542v-9j58"
+          ]
+        },
+        {
+          "id": "CVE-2026-112399",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-5xm2-6676-qcp9"
+          ]
+        },
+        {
+          "id": "CVE-2026-112892",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-gg2r-wvfm-q9rx"
+          ]
+        },
+        {
+          "id": "CVE-2026-112393",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-332p-7hrc-92wf"
+          ]
+        },
+        {
+          "id": "CVE-2026-96638",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-24rc-8hj2-v98c"
+          ]
+        },
+        {
+          "id": "CVE-2026-96640",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-mrfp-p49p-3hf2"
+          ]
+        },
+        {
+          "id": "CVE-2026-96778",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-g7cr-3p24-7wf7"
+          ]
+        },
+        {
+          "id": "CVE-2026-128067",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-xcvg-w56q-r89m"
+          ]
+        },
+        {
+          "id": "CVE-2026-128066",
+          "fix_versions": [
+            "13.0.0"
+          ],
+          "aliases": [
+            "GHSA-wqgw-9xfh-qf2g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "opencv-python-headless",
+      "version": "4.10.0.84",
+      "vulns": []
+    },
+    {
+      "name": "openpyxl",
+      "version": "3.1.5",
+      "vulns": []
+    },
+    {
+      "name": "reportlab",
+      "version": "4.2.2",
+      "vulns": []
+    },
+    {
+      "name": "httpx",
+      "version": "0.27.0",
+      "vulns": []
+    },
+    {
+      "name": "pytest",
+      "version": "8.3.3",
+      "vulns": [
+        {
+          "id": "PYSEC-2026-1845",
+          "fix_versions": [
+            "9.0.3"
+          ],
+          "aliases": [
+            "GHSA-6w46-j5rx-g56g",
+            "CVE-2025-71176"
+          ]
+        },
+        {
+          "id": "PYSEC-2026-1845",
+          "fix_versions": [
+            "9.0.3"
+          ],
+          "aliases": [
+            "GHSA-6w46-j5rx-g56g",
+            "CVE-2025-71176"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pytest-asyncio",
+      "version": "0.24.0",
+      "vulns": []
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.2",
+      "vulns": []
+    },
+    {
+      "name": "roboflow",
+      "version": "1.4.0",
+      "vulns": []
+    },
+    {
+      "name": "ifcopenshell",
+      "version": "0.9.0",
+      "vulns": []
+    },
+    {
+      "name": "trimesh",
+      "version": "5.1.1",
+      "vulns": []
+    }
+  ],
+  "fixes": []
+}

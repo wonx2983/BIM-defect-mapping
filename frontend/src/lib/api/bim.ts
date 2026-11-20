@@ -1,3 +1,5 @@
+
+import { authenticatedFetch } from '@/lib/api';
 import { api } from '@/lib/api';
 
 export interface BIMModel {
@@ -42,7 +44,7 @@ export interface MappedDefectsResponse {
   unmapped_count: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 export async function getBIMModels(projectId: string): Promise<{ models: BIMModel[]; total: number }> {
   return api.get(`/api/v1/bim/${projectId}/models`);
@@ -54,7 +56,7 @@ export async function uploadBIMModel(projectId: string, file: File): Promise<BIM
   formData.append('project_id', projectId);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-  const res = await fetch(`${API_BASE}/api/v1/bim/upload`, {
+  const res = await authenticatedFetch(`${API_BASE}/api/v1/bim/upload`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -70,6 +72,6 @@ export async function deleteBIMModel(modelId: string): Promise<void> {
   return api.del(`/api/v1/bim/model/${modelId}`);
 }
 
-export async function getMappedDefects(projectId: string): Promise<MappedDefectsResponse> {
-  return api.get(`/api/v1/bim/${projectId}/defects-mapped`);
+export async function getMappedDefects(projectId: string, modelId?: string): Promise<MappedDefectsResponse> {
+  return api.get(`/api/v1/bim/${projectId}/defects-mapped${modelId ? `?model_id=${modelId}` : ""}`);
 }

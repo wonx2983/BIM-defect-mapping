@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -63,6 +63,7 @@ class MappingResult:
     was_deduplicated: bool = False
     existing_defect_id: str | None = None
     error: str | None = None
+    record_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 def map_detection_to_element(
@@ -96,6 +97,7 @@ def map_detection_to_element(
         cy=intrinsics.cy,
         rotation_matrix=rotation_matrix,
         camera_position=camera_position,
+        dist_coeffs=intrinsics.dist,
     )
 
     # Step 2: Try trimesh-accelerated raycasting first, fall back to pure numpy
@@ -254,7 +256,7 @@ def batch_map_detections(
             # De-duplicate against existing + already-mapped in this batch
             all_existing = existing_defects + [
                 {
-                    "id": str(uuid.uuid4()),  # placeholder
+                    "id": r.record_id,
                     "bim_element_guid": r.mapped_element_guid,
                     "defect_class": r.detection.defect_class,
                     "world_position": (
@@ -267,6 +269,8 @@ def batch_map_detections(
                 if r.mapped_element_guid and not r.was_deduplicated
             ]
             result = deduplicate_detection(result, all_existing)
+            if result.existing_defect_id:
+                result.record_id = result.existing_defect_id
 
         results.append(result)
 

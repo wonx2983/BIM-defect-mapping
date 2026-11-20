@@ -14,6 +14,7 @@ from app.db.session import Base
 class DefectClass(str, enum.Enum):
     """Classification of structural defect type."""
 
+    WATER_SEEPAGE = "water_seepage"  # Legacy records remain readable; not a detector class.
     CRACK = "crack"
     SPALLING = "spalling"
     EXPOSED_REBAR = "exposed_rebar"
@@ -53,6 +54,7 @@ class Defect(Base):
     inspection_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("inspections.id"), nullable=True
     )
+    bim_model_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("bim_models.id"), nullable=True)
     bim_element_guid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     defect_class: Mapped[DefectClass] = mapped_column(Enum(DefectClass))
     severity: Mapped[SeverityLevel] = mapped_column(Enum(SeverityLevel))

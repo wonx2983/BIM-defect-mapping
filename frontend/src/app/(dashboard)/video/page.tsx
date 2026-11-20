@@ -1,11 +1,13 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/api';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import { Upload, Video, Wifi, Camera, Play, Square, Download, AlertTriangle, Loader, Film, ChevronRight, ChevronDown, CheckCircle2, X } from 'lucide-react';
 import styles from './video.module.css';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 type TabId = 'upload' | 'rtsp' | 'webcam';
 
@@ -71,6 +73,9 @@ export default function VideoDetectionPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webcamActive, setWebcamActive] = useState(false);
   const [webcamResults, setWebcamResults] = useState<Array<{ class: string; severity: string; confidence: number }>>([]);
+  const webcamStreamRef = useRef<MediaStream | null>(null);
+  const webcamBusyRef = useRef(false);
+  const webcamAbortRef = useRef<AbortController | null>(null);
   const webcamIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Project selection
@@ -87,6 +92,8 @@ export default function VideoDetectionPage() {
     return () => {
       if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
       if (webcamIntervalRef.current) clearInterval(webcamIntervalRef.current);
+      webcamStreamRef.current?.getTracks().forEach(track => track.stop());
+      webcamAbortRef.current?.abort();
     };
   }, [videoPreviewUrl]);
 
@@ -127,7 +134,7 @@ export default function VideoDetectionPage() {
       formData.append('auto_save', 'true');
 
       const token = localStorage.getItem('access_token');
-      const res = await fetch(`${API_BASE}/api/v1/video/upload`, {
+      const res = await authenticatedFetch(`${API_BASE}/api/v1/video/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -165,7 +172,7 @@ export default function VideoDetectionPage() {
       formData.append('max_frames', String(rtspMaxFrames));
 
       const token = localStorage.getItem('access_token');
-      const res = await fetch(`${API_BASE}/api/v1/video/stream/analyze`, {
+      const res = await authenticatedFetch(`${API_BASE}/api/v1/video/stream/analyze`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -191,6 +198,7 @@ export default function VideoDetectionPage() {
   const startWebcam = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      webcamStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
@@ -200,7 +208,7 @@ export default function VideoDetectionPage() {
 
       // Send frames every 2 seconds
       webcamIntervalRef.current = setInterval(async () => {
-        if (!videoRef.current || !canvasRef.current) return;
+        if (webcamBusyRef.current || !videoRef.current || !canvasRef.current || !projectId) return;
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -208,8 +216,9 @@ export default function VideoDetectionPage() {
         canvas.height = 480;
         ctx.drawImage(videoRef.current, 0, 0, 640, 480);
 
+        webcamBusyRef.current = true;
         canvas.toBlob(async (blob) => {
-          if (!blob || !projectId) return;
+          if (!blob || !projectId) { webcamBusyRef.current = false; return; }
           const formData = new FormData();
           formData.append('file', blob, 'webcam_frame.jpg');
           formData.append('project_id', projectId);
@@ -217,7 +226,9 @@ export default function VideoDetectionPage() {
 
           try {
             const token = localStorage.getItem('access_token');
-            const res = await fetch(`${API_BASE}/api/v1/detect/image`, {
+            webcamAbortRef.current = new AbortController();
+            const res = await authenticatedFetch(`${API_BASE}/api/v1/detect/image`, {
+              signal: webcamAbortRef.current.signal,
               method: 'POST',
               headers: { Authorization: `Bearer ${token}` },
               body: formData,
@@ -232,15 +243,20 @@ export default function VideoDetectionPage() {
                 }))
               );
             }
-          } catch { /* ignore frame errors */ }
+          } catch (err) {
+            if (!(err instanceof DOMException && err.name === "AbortError")) setError("Webcam analysis failed; check the connection.");
+          } finally { webcamBusyRef.current = false; }
         }, 'image/jpeg', 0.8);
       }, 2000);
-    } catch (err) {
+    } catch {
       setError('Failed to access webcam. Please grant camera permissions.');
     }
   };
 
   const stopWebcam = () => {
+    webcamAbortRef.current?.abort();
+    webcamStreamRef.current?.getTracks().forEach(track => track.stop());
+    webcamStreamRef.current = null;
     if (webcamIntervalRef.current) {
       clearInterval(webcamIntervalRef.current);
       webcamIntervalRef.current = null;
@@ -270,7 +286,7 @@ export default function VideoDetectionPage() {
             <button
               key={tab.id}
               className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ''}`}
-              onClick={() => { setActiveTab(tab.id); setError(''); setResult(null); }}
+              onClick={() => { stopWebcam(); setActiveTab(tab.id); setError(''); setResult(null); }}
             >
               <Icon size={16} />
               <span>{tab.label}</span>
@@ -496,7 +512,7 @@ export default function VideoDetectionPage() {
           <div className={styles.statsGrid}>
             <div className={styles.statCard}>
               <div className={styles.statValue}>{result.unique_defects}</div>
-              <div className={styles.statLabel}>Unique Defects</div>
+              <div className={styles.statLabel}>Defect Observations</div>
             </div>
             <div className={styles.statCard}>
               <div className={styles.statValue}>{result.total_detections}</div>
@@ -592,7 +608,7 @@ export default function VideoDetectionPage() {
                         onMouseLeave={e => (e.currentTarget.style.borderColor = 'hsl(0,0%,18%)')}
                         onClick={() => setLightboxSrc(`${API_BASE}${fd.snapshot_url}`)}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+
                         <img
                           src={`${API_BASE}${fd.snapshot_url}`}
                           alt={`Frame ${fd.frame_index}`}
@@ -633,7 +649,7 @@ export default function VideoDetectionPage() {
               onClick={async () => {
                 try {
                   const token = localStorage.getItem('access_token');
-                  const res = await fetch(`/api/proxy/video/download/${result.result_id}`, {
+                  const res = await authenticatedFetch(`/api/proxy/video/download/${result.result_id}`, {
                     headers: token ? { Authorization: `Bearer ${token}` } : {},
                   });
                   if (!res.ok) throw new Error('Download failed');
@@ -646,7 +662,7 @@ export default function VideoDetectionPage() {
                   a.click();
                   document.body.removeChild(a);
                   URL.revokeObjectURL(url);
-                } catch (err) {
+                } catch {
                   alert('Failed to download video. Please try again.');
                 }
               }}
@@ -682,7 +698,7 @@ export default function VideoDetectionPage() {
           >
             <X size={18} />
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+
           <img
             src={lightboxSrc}
             alt="Frame preview"

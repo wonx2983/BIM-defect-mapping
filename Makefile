@@ -27,7 +27,8 @@ test-frontend:
 	cd frontend && npm run test
 
 clean:
-	docker-compose down -v
+	docker-compose down
 
+# seed: no implicit database seeding
 seed:
-	cd backend && python -m app.db.seed
+	@echo "Create projects through the authenticated API."

@@ -1,5 +1,7 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/api';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '@/stores/projectStore';
 import {
@@ -7,19 +9,17 @@ import {
   type BIMModel, type MappedDefectsResponse,
 } from '@/lib/api/bim';
 import {
-  getCameras, createCamera, deleteCamera, runCameraDetection,
+  getCameras, updateCamera, createCamera, deleteCamera, runCameraDetection,
   type Camera, type CameraDetectionResult,
 } from '@/lib/api/cameras';
-import { api } from '@/lib/api';
 import {
   Upload, MapPin, Video, Info, Plus, Trash2, Play, Loader,
-  Target, X, Eye, Wifi, ChevronDown, Crosshair, CheckCircle2, AlertTriangle, Settings,
+  Target, X, Eye, Wifi, Crosshair, CheckCircle2, AlertTriangle, Settings,
 } from 'lucide-react';
 import {
   getMarkers, createMarker, deleteMarker,
-  calibrateCamera, getCalibrationStatus,
-  runAutoMappedDetection,
-  type FiducialMarker, type CalibrationResult,
+  calibrateCamera,
+  type FiducialMarker,
 } from '@/lib/api/calibration';
 import styles from './viewer.module.css';
 
@@ -30,7 +30,7 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: '#cd3333',
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 type SidePanelTab = 'defects' | 'cameras' | 'markers' | 'properties';
 
@@ -53,7 +53,6 @@ export default function ViewerPage() {
   const componentsRef = useRef<any>(null);
   const worldRef = useRef<any>(null);
   const fragmentsRef = useRef<any>(null);
-  const highlighterRef = useRef<any>(null);
 
   // Side panel
   const [activeTab, setActiveTab] = useState<SidePanelTab>('defects');
@@ -80,8 +79,9 @@ export default function ViewerPage() {
   const [showMarkerForm, setShowMarkerForm] = useState(false);
   const [markerForm, setMarkerForm] = useState({
     marker_dict_id: '0', physical_size_m: '0.20', description: '',
+    world_x: '', world_y: '', world_z: '', normal_x: '0', normal_y: '0', normal_z: '1', rotation_deg: '0',
   });
-  const [registeringMarker, setRegisteringMarker] = useState(false);
+  const registeringMarker = false;
 
   // Upload
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,31 +100,29 @@ export default function ViewerPage() {
     if (!projectId && projects.length > 0) setProjectId(projects[0].id);
   }, [projectId, projects]);
 
-  // Load BIM models + defects + cameras when project changes
+  // Cancel stale project requests so assets never carry over to another project.
   useEffect(() => {
     if (!projectId) return;
-    setIsLoading(true);
-    Promise.all([
-      getBIMModels(projectId).catch(() => ({ models: [], total: 0 })),
-      getMappedDefects(projectId).catch(() => null),
-      getCameras(projectId).catch(() => ({ cameras: [], total: 0 })),
-      getMarkers(projectId).catch(() => ({ markers: [], total: 0 })),
-    ]).then(([bimData, defects, cameraData, markerData]) => {
-      setBimModels(bimData.models);
-      if (bimData.models.length > 0 && !selectedModel) {
-        setSelectedModel(bimData.models[0]);
-      }
-      if (defects) setDefectsData(defects);
-      setCameras(cameraData.cameras);
-      setMarkers(markerData.markers);
-    }).finally(() => setIsLoading(false));
+    let cancelled = false;
+    setIsLoading(true); setSelectedModel(null); setDefectsData(null);
+    setCameras([]); setMarkers([]); setBimModels([]);
+    Promise.all([getBIMModels(projectId), getMappedDefects(projectId),
+      getCameras(projectId), getMarkers(projectId)])
+      .then(([bimData, defects, cameraData, markerData]) => {
+        if (cancelled) return;
+        setBimModels(bimData.models); setSelectedModel(bimData.models[0] ?? null);
+        setDefectsData(defects); setCameras(cameraData.cameras); setMarkers(markerData.markers);
+      }).catch(err => { if (!cancelled) setError(String(err)); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, [projectId]);
 
   // ── 3D Viewer Initialization (Three.js + web-ifc direct) ────────
   useEffect(() => {
-    if (!containerRef.current || viewerReady) return;
+    if (!containerRef.current) return;
 
     let disposed = false;
+    let detachResize: (() => void) | undefined;
 
     async function initViewer() {
       try {
@@ -196,6 +194,7 @@ export default function ViewerPage() {
         window.addEventListener('resize', handleResize);
         const resizeObserver = new ResizeObserver(handleResize);
         resizeObserver.observe(container);
+        detachResize = () => { window.removeEventListener("resize", handleResize); resizeObserver.disconnect(); };
 
         // Store refs
         componentsRef.current = { scene, camera, renderer, controls, raycaster, mouse, THREE };
@@ -212,6 +211,7 @@ export default function ViewerPage() {
 
     return () => {
       disposed = true;
+      detachResize?.();
       if (componentsRef.current) {
         try {
           componentsRef.current.renderer?.dispose();
@@ -251,7 +251,7 @@ export default function ViewerPage() {
           roughness: 0.2,
         });
         const pin = new THREE.Mesh(geometry, material);
-        pin.position.set(x, y, z);
+        pin.position.set(x, z, -y);
         pin.name = `defect_pin_${d.id}`;
         scene.add(pin);
       });
@@ -259,6 +259,15 @@ export default function ViewerPage() {
       console.error('Failed to render 3D defect pins:', err);
     }
   }, []);
+
+  useEffect(() => {
+    if (!projectId || !selectedModel) return;
+    let cancelled = false;
+    getMappedDefects(projectId, selectedModel.id).then(data => {
+      if (!cancelled) { setDefectsData(data); void updateDefectPins(data.mapped); }
+    }).catch(err => { if (!cancelled) setError(String(err)); });
+    return () => { cancelled = true; };
+  }, [projectId, selectedModel, updateDefectPins]);
 
   // ── Load IFC Model (direct web-ifc + Three.js) ────────────────────
   const loadIFCModel = useCallback(async (model: BIMModel) => {
@@ -279,7 +288,7 @@ export default function ViewerPage() {
 
       // Fetch the IFC file from backend
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${API_BASE}${model.file_url}`, {
+      const response = await authenticatedFetch(`${API_BASE}${model.file_url}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) {
@@ -289,7 +298,7 @@ export default function ViewerPage() {
       const data = new Uint8Array(buffer);
 
       // Open IFC model
-      const modelID = ifcApi.OpenModel(data);
+      const modelID = ifcApi.OpenModel(data, { COORDINATE_TO_ORIGIN: false });
 
       // Remove previous model meshes
       const toRemove = scene.children.filter((c: any) => c.name === 'ifc_model');
@@ -513,7 +522,7 @@ export default function ViewerPage() {
     if (!hit || !hit.object) return;
 
     const point = hit.point;
-    const worldPosition = { x: point.x, y: point.y, z: point.z };
+    const worldPosition = { x: point.x, y: -point.z, z: point.y };
     const expressID = hit.object.userData?.expressID;
 
     // Get element GUID from web-ifc properties
@@ -537,13 +546,14 @@ export default function ViewerPage() {
       try {
         const token = localStorage.getItem('access_token');
         // Use same-origin proxy to avoid CORS issues with PUT
-        const putRes = await fetch(`/api/proxy/defects/${mappingDefectId}`, {
+        const putRes = await authenticatedFetch(`/api/proxy/defects/${mappingDefectId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
+            bim_model_id: selectedModel?.id,
             bim_element_guid: elementGuid,
             world_position: worldPosition,
           }),
@@ -561,7 +571,7 @@ export default function ViewerPage() {
 
         // Refresh defects
         if (projectId) {
-          const defects = await getMappedDefects(projectId);
+          const defects = await getMappedDefects(projectId, selectedModel?.id);
           setDefectsData(defects);
           updateDefectPins(defects.mapped);
         }
@@ -595,7 +605,7 @@ export default function ViewerPage() {
       outline.name = 'selection_outline';
       scene.add(outline);
     }
-  }, [raycastIFC, mappingDefectId, projectId, defectsData, getElementProperties, updateDefectPins]);
+  }, [raycastIFC, mappingDefectId, projectId, selectedModel?.id, defectsData, getElementProperties, updateDefectPins]);
 
   // ── Upload IFC ────────────────────────────────────────────────────
   const handleUploadIFC = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -629,13 +639,14 @@ export default function ViewerPage() {
         bim_zone_label: cameraForm.zone_label || undefined,
         location_description: cameraForm.location || undefined,
         bim_element_guid: selectedElementGuid || undefined,
-        world_position: selectedElementGuid ? { x: 0, y: 0, z: 0 } : undefined,
-        auto_detect_enabled: true,
+
+        fov_horizontal_deg: cameraForm.fov ? Number(cameraForm.fov) : undefined,
+        auto_detect_enabled: false,
         auto_detect_interval_minutes: 15,
       });
       setCameras((prev) => [camera, ...prev]);
       setShowCameraForm(false);
-      setCameraForm({ name: '', rtsp_url: '', zone_label: '', location: '' });
+      setCameraForm({ name: '', rtsp_url: '', zone_label: '', location: '', fov: '' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add camera');
     }
@@ -650,7 +661,7 @@ export default function ViewerPage() {
       setCameraResult(result);
       // Refresh defects to show new pins
       if (projectId) {
-        const defects = await getMappedDefects(projectId);
+        const defects = await getMappedDefects(projectId, selectedModel?.id);
         setDefectsData(defects);
         updateDefectPins(defects.mapped);
       }
@@ -817,8 +828,8 @@ export default function ViewerPage() {
                               if (d.world_position && componentsRef.current) {
                                 const { camera, controls } = componentsRef.current;
                                 const { x, y, z } = d.world_position;
-                                camera.position.set(x + 8, y + 6, z + 8);
-                                controls.target.set(x, y, z);
+                                camera.position.set(x + 8, z + 6, -y + 8);
+                                controls.target.set(x, z, -y);
                                 controls.update();
                               }
                             }}
@@ -839,7 +850,7 @@ export default function ViewerPage() {
                             onClick={async () => {
                               try {
                                 const token = localStorage.getItem('access_token');
-                                const res = await fetch(`/api/proxy/defects/${d.id}`, {
+                                const res = await authenticatedFetch(`/api/proxy/defects/${d.id}`, {
                                   method: 'PUT',
                                   headers: {
                                     'Content-Type': 'application/json',
@@ -849,13 +860,13 @@ export default function ViewerPage() {
                                 });
                                 if (!res.ok) throw new Error('Failed to unmap');
                                 if (projectId) {
-                                  const defects = await getMappedDefects(projectId);
+                                  const defects = await getMappedDefects(projectId, selectedModel?.id);
                                   setDefectsData(defects);
                                   updateDefectPins(defects.mapped);
                                 }
                                 setMappingSuccess('🔄 Defect unmapped from BIM element');
                                 setTimeout(() => setMappingSuccess(''), 3000);
-                              } catch (err) {
+                              } catch {
                                 setError('Failed to unmap defect');
                               }
                             }}
@@ -961,6 +972,11 @@ export default function ViewerPage() {
                       {cam.total_defects_found} defects found
                       {cam.last_detection_at && ` • Last: ${new Date(cam.last_detection_at).toLocaleDateString()}`}
                       {cam.auto_detect_enabled && ` • Auto: every ${cam.auto_detect_interval_minutes}min`}
+                      {cam.calibration_status === 'calibrated' && <button className="btn btn-secondary" onClick={async () => {
+                        try { const updated = await updateCamera(cam.id, { auto_detect_enabled: !cam.auto_detect_enabled });
+                          setCameras(prev => prev.map(c => c.id === updated.id ? updated : c));
+                        } catch (err) { setError(String(err)); }
+                      }}>{cam.auto_detect_enabled ? 'Disable schedule' : 'Enable 15-minute schedule'}</button>}
                     </div>
 
                     {/* Calibration Status */}
@@ -1074,7 +1090,7 @@ export default function ViewerPage() {
                         </div>
                         <div className={styles.resultItem}>
                           <span className={styles.resultLabel}>Unique Defects Saved</span>
-                          <span className={styles.resultValue}>{cameraResult.unique_defects_saved}</span>
+                          <span className={styles.resultValue}>{cameraResult.mapped_count ?? cameraResult.unique_defects_saved}</span>
                         </div>
                         {cameraResult.bim_zone && (
                           <div className={styles.resultItem}>
@@ -1145,6 +1161,14 @@ export default function ViewerPage() {
                       </div>
                     )}
 
+                    <p style={{ fontSize: 12 }}>Enter the surveyed marker centre in IFC world coordinates (metres), its outward surface normal, and printed-marker rotation. At least two registered markers must be visible during calibration.</p>
+                    {(['world_x', 'world_y', 'world_z', 'normal_x', 'normal_y', 'normal_z', 'rotation_deg'] as const).map(field => (
+                      <label key={field} style={{ display: 'block', marginBottom: 8 }}>
+                        {field.replaceAll('_', ' ')}
+                        <input className="input" type="number" step="any" required value={markerForm[field]}
+                          onChange={e => setMarkerForm({ ...markerForm, [field]: e.target.value })} />
+                      </label>
+                    ))}
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
                         className="btn btn-primary"
@@ -1152,6 +1176,9 @@ export default function ViewerPage() {
                         onClick={async () => {
                           if (!projectId) return;
                           try {
+                            if ([markerForm.world_x, markerForm.world_y, markerForm.world_z].some(v => !v.trim() || !Number.isFinite(Number(v)))) {
+                              throw new Error('Enter surveyed marker coordinates in BIM metres.');
+                            }
                             const m = await createMarker({
                               project_id: projectId,
                               marker_dict_id: parseInt(markerForm.marker_dict_id) || 0,
@@ -1159,13 +1186,17 @@ export default function ViewerPage() {
                               bim_model_id: selectedModel?.id,
                               bim_element_guid: selectedElementGuid || undefined,
                               bim_point_description: markerForm.description || undefined,
-                              world_x: 0,
-                              world_y: 0,
-                              world_z: 0,
+                              world_x: Number(markerForm.world_x),
+                              world_y: Number(markerForm.world_y),
+                              world_z: Number(markerForm.world_z),
+                              normal_x: Number(markerForm.normal_x),
+                              normal_y: Number(markerForm.normal_y),
+                              normal_z: Number(markerForm.normal_z),
+                              rotation_deg: Number(markerForm.rotation_deg),
                             });
                             setMarkers((prev) => [m, ...prev]);
                             setShowMarkerForm(false);
-                            setMarkerForm({ marker_dict_id: '0', physical_size_m: '0.20', description: '' });
+                            setMarkerForm({ marker_dict_id: '0', physical_size_m: '0.20', description: '', world_x: '', world_y: '', world_z: '', normal_x: '0', normal_y: '0', normal_z: '1', rotation_deg: '0' });
                           } catch (err) {
                             setError(err instanceof Error ? err.message : 'Failed to register marker');
                           }

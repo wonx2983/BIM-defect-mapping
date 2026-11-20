@@ -315,7 +315,6 @@ def test_02_synthetic_frame_and_marker_detection():
     assert detected_ids == [0, 1], f"Expected IDs [0, 1], got {detected_ids}"
 
     print("  ✅ PASS: Both ArUco markers detected in synthetic frame")
-    return frame, detected
 
 
 def test_03_pnp_pose_recovery():
@@ -384,7 +383,6 @@ def test_03_pnp_pose_recovery():
 
     print("  PASS: PnP recovered camera position within 20 cm of ground truth")
     print(f"           Reprojection error: {result.reprojection_error:.4f} px (threshold: 2.0)")
-    return result, intrinsics
 
 
 def test_04_frustum_culling():
@@ -426,7 +424,6 @@ def test_04_frustum_culling():
 
     print("  PASS: Frustum culling correctly identifies visible elements")
     print(f"           North wall: IN (confirmed)")
-    return candidates
 
 
 def test_05_pixel_to_ray():
@@ -501,6 +498,7 @@ def test_06_raycasting():
 
         hit = raycast_against_meshes(ray, meshes, max_distance=100.0)
 
+        assert hit is not None, "Expected ray to intersect north wall"
         if hit:
             expected_hit_pt = compute_expected_hit(u, v, R_gt, t_gt, K, target_y=10.0)
             print(f"  {label} ({u:.0f}, {v:.0f}):")
@@ -864,7 +862,7 @@ def main():
     print("\n" + "="*70)
     print(f"  RESULTS: {passed} passed, {failed} failed out of {len(tests)} tests")
     if failed == 0:
-        print("  🏆 ALL TESTS PASSED — Pipeline is production-ready!")
+        print("  🏆 ALL TESTS PASSED — Synthetic component checks passed; field validation is separate.")
     else:
         print(f"  ⚠️  {failed} test(s) failed — review output above")
     print("="*70)

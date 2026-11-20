@@ -2,16 +2,19 @@
 
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto",
+    pbkdf2_sha256__default_rounds=600_000,
+)
 
 
 def hash_password(password: str) -> str:
-    """Hash a plain-text password using bcrypt."""
+    """Hash the entire password; retain verification of legacy bcrypt hashes."""
     return pwd_context.hash(password)
 
 
@@ -65,7 +68,8 @@ def decode_token(token: str) -> dict:
         Decoded payload dictionary.
 
     Raises:
-        JWTError: If the token is invalid or expired.
+        InvalidTokenError: If the token is invalid or expired.
     """
     settings = get_settings()
-    return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM],
+                      options={"require": ["exp", "sub", "type"]})

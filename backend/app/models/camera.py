@@ -105,7 +105,7 @@ class Camera(Base):
     # ── Candidate element set ────────────────────────────────────────
     # GUIDs of BIM elements inside this camera's view frustum.
     # Computed automatically after calibration; raycasting is restricted to this set.
-    candidate_element_guids: Mapped[dict | None] = mapped_column(
+    candidate_element_guids: Mapped[list[str] | None] = mapped_column(
         JSON, nullable=True,
         comment="List of BIM element GUIDs within this camera's view frustum",
     )
@@ -134,6 +134,9 @@ class Camera(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claimed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     project: Mapped["Project"] = relationship(foreign_keys=[project_id])  # noqa: F821

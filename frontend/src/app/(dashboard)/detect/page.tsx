@@ -13,7 +13,7 @@ const SEVERITY_STYLES: Record<string, string> = {
   critical: styles.severityCritical,
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = '';
 
 function formatClass(cls: string): string {
   return cls.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
@@ -51,7 +51,7 @@ export default function DetectPage() {
 
   const displayImage = selectedFile
     ? selectedResult?.annotated_image_url
-      ? `${API_BASE}${selectedResult.annotated_image_url}`
+      ? selectedResult.annotated_image_url.startsWith("data:") ? selectedResult.annotated_image_url : `${API_BASE}${selectedResult.annotated_image_url}`
       : selectedFile.preview
     : null;
 

@@ -3,8 +3,8 @@
 import uuid
 from typing import Callable
 
-from fastapi import Depends, Header
-from jose import JWTError
+from fastapi import Depends, Header, Request
+from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +15,7 @@ from app.models.user import User, UserRole
 
 
 async def get_current_user(
-    authorization: str = Header(..., description="Bearer <token>"),
+    authorization: str | None = Header(None, description="Bearer <token>"),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Extract and validate JWT from Authorization header, return the user.
@@ -23,14 +23,14 @@ async def get_current_user(
     Raises:
         UnauthorizedError: If token is missing, invalid, or user not found.
     """
-    if not authorization.startswith("Bearer "):
+    if not authorization or not authorization.startswith("Bearer "):
         raise UnauthorizedError("Invalid authorization header format")
 
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
         payload = decode_token(token)
-    except JWTError:
+    except InvalidTokenError:
         raise UnauthorizedError("Invalid or expired token")
 
     if payload.get("type") != "access":
@@ -40,16 +40,22 @@ async def get_current_user(
     if not user_id:
         raise UnauthorizedError("Invalid token payload")
 
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        parsed_id = uuid.UUID(user_id)
+    except (ValueError, TypeError):
+        raise UnauthorizedError("Invalid token payload")
+    result = await db.execute(select(User).where(User.id == parsed_id))
     user = result.scalar_one_or_none()
 
     if not user:
         raise UnauthorizedError("User not found")
 
+    db.info["actor_id"] = user.id
     return user
 
 
 async def get_current_active_user(
+    request: Request,
     user: User = Depends(get_current_user),
 ) -> User:
     """Ensure the current user is active.
@@ -57,6 +63,8 @@ async def get_current_active_user(
     Raises:
         ForbiddenError: If the user account is deactivated.
     """
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and user.role == UserRole.VIEWER:
+        raise ForbiddenError("Viewer accounts are read-only")
     if not user.is_active:
         raise ForbiddenError("Account is deactivated")
     return user

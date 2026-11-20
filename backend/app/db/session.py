@@ -13,22 +13,15 @@ settings = get_settings()
 
 # asyncpg doesn't support sslmode/ssl as URL params for Neon.
 # Strip it from the URL and pass ssl context via connect_args instead.
-db_url = settings.DATABASE_URL
+from sqlalchemy.engine import make_url
+parsed_url = make_url(settings.DATABASE_URL)
+query = dict(parsed_url.query)
+ssl_mode = query.pop("sslmode", query.pop("ssl", None))
+query.pop("channel_binding", None)
+db_url = parsed_url.set(query=query)
 connect_args: dict = {}
-
-if "neon.tech" in db_url or "ssl=require" in db_url or "sslmode=require" in db_url:
-    # Remove ssl/sslmode params from URL
-    for param in ["?ssl=require", "&ssl=require", "?sslmode=require", "&sslmode=require",
-                  "?channel_binding=require", "&channel_binding=require"]:
-        db_url = db_url.replace(param, "")
-    # Clean up leftover ? or &
-    if db_url.endswith("?") or db_url.endswith("&"):
-        db_url = db_url[:-1]
-    # Use SSL context for asyncpg
-    ssl_context = _ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = _ssl.CERT_NONE
-    connect_args["ssl"] = ssl_context
+if ssl_mode in {"require", "verify-full", "verify-ca"} or "neon.tech" in (parsed_url.host or ""):
+    connect_args["ssl"] = _ssl.create_default_context()
 
 engine = create_async_engine(
     db_url,

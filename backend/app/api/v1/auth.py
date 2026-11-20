@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,7 +40,7 @@ def _build_token_payload(user: User) -> dict:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
     """Register a new user and organization. Returns JWT token pair."""
     # Check if email already exists
     existing = await db.execute(select(User).where(User.email == body.email))
@@ -65,14 +65,16 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
     # Generate tokens
     payload = _build_token_payload(user)
+    access_token = create_access_token(payload)
+    _media_cookie(response, access_token)
     return TokenResponse(
-        access_token=create_access_token(payload),
+        access_token=access_token,
         refresh_token=create_refresh_token(payload),
     )
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
     """Authenticate with email and password. Returns JWT token pair."""
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
@@ -84,14 +86,16 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise UnauthorizedError("Account is deactivated")
 
     payload = _build_token_payload(user)
+    access_token = create_access_token(payload)
+    _media_cookie(response, access_token)
     return TokenResponse(
-        access_token=create_access_token(payload),
+        access_token=access_token,
         refresh_token=create_refresh_token(payload),
     )
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_token(body: RefreshRequest, response: Response, db: AsyncSession = Depends(get_db)):
     """Refresh an expired access token using a valid refresh token."""
     try:
         payload = decode_token(body.refresh_token)
@@ -101,16 +105,21 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
     if payload.get("type") != "refresh":
         raise UnauthorizedError("Invalid token type")
 
-    user_id = payload.get("sub")
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        user_id = uuid.UUID(payload.get("sub", ""))
+    except (ValueError, TypeError):
+        raise UnauthorizedError("Invalid token payload")
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user or not user.is_active:
         raise UnauthorizedError("User not found or inactive")
 
     new_payload = _build_token_payload(user)
+    access_token = create_access_token(new_payload)
+    _media_cookie(response, access_token)
     return TokenResponse(
-        access_token=create_access_token(new_payload),
+        access_token=access_token,
         refresh_token=create_refresh_token(new_payload),
     )
 
@@ -119,3 +128,16 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
 async def get_me(user: User = Depends(get_current_active_user)):
     """Get the current authenticated user's profile."""
     return UserResponse.model_validate(user)
+
+
+def _media_cookie(response, token):
+    from app.core.config import get_settings
+    settings = get_settings()
+    response.set_cookie("defectsync_media", token, httponly=True,
+                        secure=settings.APP_ENV == "production", samesite="strict",
+                        max_age=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60, path="/uploads")
+
+
+@router.post("/logout", status_code=204)
+async def logout(response: Response):
+    response.delete_cookie("defectsync_media", path="/uploads")

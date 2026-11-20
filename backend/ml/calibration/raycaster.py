@@ -63,6 +63,7 @@ def pixel_to_ray(
     cy: float,
     rotation_matrix: np.ndarray,
     camera_position: np.ndarray,
+    dist_coeffs: np.ndarray | None = None,
 ) -> Ray:
     """Convert a pixel coordinate into a 3D ray in world space.
 
@@ -79,6 +80,13 @@ def pixel_to_ray(
     Returns:
         A ``Ray`` originating at the camera position.
     """
+    if not np.isfinite([u, v, fx, fy, cx, cy]).all() or fx <= 0 or fy <= 0:
+        raise ValueError("Invalid pixel or camera intrinsics")
+    if dist_coeffs is not None:
+        import cv2
+        K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=float)
+        point = cv2.undistortPoints(np.array([[[u, v]]], dtype=float), K, dist_coeffs, P=K)[0, 0]
+        u, v = float(point[0]), float(point[1])
     # Direction in camera-local space
     dir_cam = np.array([
         (u - cx) / fx,

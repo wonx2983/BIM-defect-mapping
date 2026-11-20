@@ -8,6 +8,7 @@ the YOLO detector and the severity classifier into a single pipeline.
 
 import io
 import logging
+from threading import Lock
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -128,6 +129,7 @@ class DefectDetector:
     ):
         import time
 
+        self._inference_lock = Lock()
         self.device = device
         self.confidence_threshold = confidence_threshold
 
@@ -136,11 +138,14 @@ class DefectDetector:
         start = time.time()
         try:
             from ultralytics import YOLO
+            if not Path(detector_path).is_file():
+                raise FileNotFoundError("Detector weights not found")
             self.yolo = YOLO(str(detector_path))
+            if self.yolo.names != CLASS_NAMES:
+                raise ValueError("Detector class taxonomy does not match application")
             logger.info(f"YOLO loaded in {(time.time() - start) * 1000:.0f}ms")
         except Exception as e:
-            logger.warning(f"Could not load YOLO model: {e}. Running in demo mode.")
-            self.yolo = None
+            raise RuntimeError("Detector could not be loaded; inference is unavailable") from e
 
         # Load severity classifier (optional)
         self.severity_model = None
@@ -154,6 +159,9 @@ class DefectDetector:
                 )
                 from ml.training.train_severity import build_model
 
+                self.severity_classes = checkpoint.get("classes")
+                if set(self.severity_classes or []) != {"low", "medium", "high", "critical"}:
+                    raise ValueError("Invalid severity class mapping")
                 self.severity_model = build_model(num_classes=4, pretrained=False)
                 self.severity_model.load_state_dict(checkpoint["model_state_dict"])
                 self.severity_model.to(device)
@@ -167,11 +175,15 @@ class DefectDetector:
                 ])
                 logger.info("Severity classifier loaded successfully.")
             except Exception as e:
-                logger.warning(f"Could not load severity model: {e}. Using rule-based severity.")
+                raise RuntimeError("Configured severity classifier is invalid") from e
         else:
             logger.info("No severity model found. Using rule-based severity estimation.")
 
     def predict(self, image: Image.Image) -> InferenceResult:
+        with self._inference_lock:
+            return self._predict(image)
+
+    def _predict(self, image: Image.Image) -> InferenceResult:
         """Run full detection + severity pipeline on a single PIL Image.
 
         Args:
@@ -187,11 +199,8 @@ class DefectDetector:
         result = InferenceResult(image_width=w, image_height=h)
 
         if self.yolo is None:
-            # Demo mode — return synthetic detections for testing the UI
-            result.detections = self._generate_demo_detections(w, h)
-            result.inference_time_ms = (time.time() - start) * 1000
-            result.model_name = "demo"
-            return result
+            raise RuntimeError("Detector unavailable")
+        result.model_name = "yolo11"
 
         # Run YOLO detection
         yolo_results = self.yolo(
@@ -286,7 +295,8 @@ class DefectDetector:
                     output = self.severity_model(tensor)
                     probs = torch.softmax(output, dim=1)[0]
                 # Weighted score: low=0.125, medium=0.375, high=0.625, critical=0.875
-                weights = torch.tensor([0.125, 0.375, 0.625, 0.875]).to(self.device)
+                scores = {"low": 0.125, "medium": 0.375, "high": 0.625, "critical": 0.875}
+                weights = torch.tensor([scores[c] for c in self.severity_classes]).to(self.device)
                 return float((probs * weights).sum().item())
             except Exception as e:
                 logger.warning(f"Severity model inference failed: {e}. Falling back to rules.")
@@ -324,28 +334,3 @@ class DefectDetector:
             + edge_score * 0.15
         )
         return max(0.0, min(1.0, severity_score))
-
-    def _generate_demo_detections(self, w: int, h: int) -> list[DetectionResult]:
-        """Generate synthetic detections for demo/testing when no model is loaded."""
-        import random
-
-        demos = [
-            ("crack", 0.92, 0.15, 0.3, 0.45, 0.35),
-            ("spalling", 0.87, 0.55, 0.2, 0.75, 0.45),
-            ("exposed_rebar", 0.78, 0.1, 0.6, 0.35, 0.85),
-        ]
-        results = []
-        for cls, conf, nx1, ny1, nx2, ny2 in demos:
-            x1, y1, x2, y2 = nx1 * w, ny1 * h, nx2 * w, ny2 * h
-            bbox_w, bbox_h = x2 - x1, y2 - y1
-            sev_score = random.uniform(0.2, 0.9)
-            results.append(DetectionResult(
-                defect_class=cls,
-                confidence=conf,
-                severity=severity_from_score(sev_score),
-                severity_score=sev_score,
-                bbox={"x": round(nx1, 4), "y": round(ny1, 4), "w": round((nx2 - nx1), 4), "h": round((ny2 - ny1), 4)},
-                bbox_pixels={"x1": round(x1), "y1": round(y1), "x2": round(x2), "y2": round(y2)},
-                dimensions={"width_px": round(bbox_w), "height_px": round(bbox_h), "area_px": round(bbox_w * bbox_h)},
-            ))
-        return results

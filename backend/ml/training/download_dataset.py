@@ -174,7 +174,9 @@ def merge_dataset_into(
 
             # Remap labels
             remapped_lines = remap_label_file(lbl_file, remap)
-            if not remapped_lines:
+            # Preserve verified empty annotations as background examples.
+            # Unknown nonempty labels are not safe to turn into negative examples.
+            if not remapped_lines and lbl_file.read_text().strip():
                 stats["skipped"] += 1
                 continue
 
