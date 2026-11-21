@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>DefectSync · Full-pipeline review</title>
+<style>body{font:17px/1.6 system-ui;max-width:1050px;margin:3rem auto;padding:0 1.2rem;color:#13283a}
+video,img{display:block;width:100%;border-radius:8px}table{border-collapse:collapse;width:100%}
+th,td{text-align:left;border-bottom:1px solid #d0dce4;padding:.45rem}.scroll{overflow:auto} .lead{font-size:20px}</style>
+<h1>DefectSync: full-pipeline photo test</h1>
+<p class="lead"><strong>The selected crack was detected automatically and mapped to C1.</strong>
+The selected false efflorescence alert did not map to an IFC element.</p>
+<video controls preload="metadata" poster="recorded-result.png" src="tiled-pipeline-live.mp4"></video>
+<h2>Scope</h2><p>This is a two-output review of the run, not a census of model predictions.
+It shows the highest-confidence crack and efflorescence outputs for the two categories under review.
+The boxes come directly from YOLO, without manually supplied crack coordinates. The crack is the supplied
+test mark in the image, not a claim that the physical structure is cracked. The efflorescence box is marked
+false for this review and was not independently verified at the site.</p>
+<h2>Execution</h2><ol><li>YOLO processed the full 1024 × 466 image plus 15 overlapping tiles
+at confidence threshold 0.25. Tile boxes were translated back into full-frame pixels
+and overlapping duplicates were suppressed.</li><li>OpenCV decoded ArUco ID 0 on C2.
+The 0.150 m black square is registered at (4.245, 0, 1.2285) m. Estimated marker reprojection error
+was 0.438 px at the assumed 65° horizontal field of view.</li>
+<li>DefectSync cast rays from the centres of the selected YOLO boxes into the measured IFC.</li></ol>
+<div class="scroll"><table><thead><tr><th>YOLO class</th><th>Confidence</th><th>Full-frame box</th><th>Pixel centre</th>
+<th>Mapping</th><th>Review label</th></tr></thead><tbody><tr><td>Crack</td><td>53.9%</td><td>[65, 197, 136, 278]</td><td>[100.5, 237.5]</td><td>C1</td><td>confirmed crack in test image</td></tr><tr><td>Efflorescence</td><td>33.0%</td><td>[525, 163, 618, 185]</td><td>[571.5, 174.0]</td><td>No IFC hit</td><td>false alert per review</td></tr></tbody></table></div>
+<p>The crack ray intersected C1 at (0.450, 0.000, 1.188) m, IFC GUID <code>2neqv4rI1T6QdRZftGQG7J</code>.
+The miss for the false alert is a mapping result; a ray miss alone does not prove a detector alert is false.
+The camera field of view is assumed and the hit has no independent physical ground truth.</p>
+<p><a href="review-results.json">Selected results and calibration data</a> · <a href="../measured-facade.ifc">Measured IFC</a></p>
+</html>
