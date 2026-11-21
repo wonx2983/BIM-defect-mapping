@@ -27,12 +27,9 @@ jobs:
           POSTGRES_USER: audit_test
           POSTGRES_PASSWORD: test-only
           POSTGRES_DB: defectsync_test
-        ports: ['55432:5432']
+        ports: ['5432']
         options: --health-cmd "pg_isready -U audit_test" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      TEST_DATABASE_URL: postgresql+asyncpg://audit_test:test-only@127.0.0.1:55432/defectsync_test
-      DATABASE_URL: postgresql+asyncpg://audit_test:test-only@127.0.0.1:55432/defectsync_test
-      DATABASE_URL_SYNC: postgresql+psycopg://audit_test:test-only@127.0.0.1:55432/defectsync_test
       APP_ENV: test
       JWT_SECRET_KEY: test-only-secret-not-for-production-12345
       YOLO_CONFIG_DIR: /tmp/ultralytics
@@ -41,6 +38,17 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - name: Configure the allocated Postgres port
+        env:
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+        run: |
+          test -n "$POSTGRES_PORT"
+          database="audit_test:test-only@127.0.0.1:${POSTGRES_PORT}/defectsync_test"
+          {
+            echo "TEST_DATABASE_URL=postgresql+asyncpg://$database"
+            echo "DATABASE_URL=postgresql+asyncpg://$database"
+            echo "DATABASE_URL_SYNC=postgresql+psycopg://$database"
+          } >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

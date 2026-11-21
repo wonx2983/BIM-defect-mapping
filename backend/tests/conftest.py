@@ -1,7 +1,19 @@
 """Isolated test DB. Never use the application's configured remote database."""
 import os
-os.environ["DATABASE_URL"] = "postgresql+asyncpg://audit_test@127.0.0.1:55432/defectsync_test"
-os.environ["DATABASE_URL_SYNC"] = "postgresql+psycopg://audit_test@127.0.0.1:55432/defectsync_test"
+from sqlalchemy.engine import make_url
+
+_test_url = make_url(os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:"))
+if _test_url.get_backend_name() == "sqlite" and _test_url.database == ":memory:":
+    # App imports still initialise an asyncpg engine; tests inject their SQLite session.
+    _app_test_url = make_url("postgresql+asyncpg://audit_test@127.0.0.1:55432/defectsync_test")
+elif (_test_url.get_backend_name() == "postgresql"
+      and _test_url.host in {"localhost", "127.0.0.1", "::1"}
+      and _test_url.database == "defectsync_test"):
+    _app_test_url = _test_url
+else:
+    raise RuntimeError("Tests require in-memory SQLite or a disposable local defectsync_test database")
+os.environ["DATABASE_URL"] = _app_test_url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
+os.environ["DATABASE_URL_SYNC"] = _app_test_url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
 os.environ["APP_ENV"] = "test"
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-not-for-deployment-123456789"
 os.environ["CAMERA_ALLOWED_HOSTS"] = "camera.example"
@@ -12,7 +24,6 @@ from types import SimpleNamespace
 import pytest
 import httpx
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.engine import make_url
 from app.db.base import Base
 from app.db.session import get_db
 from app.models import Organization, User, Project, BIMModel, Camera
@@ -25,14 +36,7 @@ from app.core.config import get_settings
 
 @pytest.fixture
 async def context(tmp_path, monkeypatch):
-    database = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    url = make_url(database)
-    if url.get_backend_name() == "sqlite":
-        if url.database != ":memory:":
-            raise RuntimeError("Tests require in-memory SQLite")
-    elif url.host not in {"localhost", "127.0.0.1", "::1"} or url.database != "defectsync_test":
-        raise RuntimeError("Tests require the disposable local defectsync_test database")
-    engine = create_async_engine(database)
+    engine = create_async_engine(_test_url)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
