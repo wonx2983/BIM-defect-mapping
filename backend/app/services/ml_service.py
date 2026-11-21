@@ -49,6 +49,10 @@ def _load_detector() -> DefectDetector:
         severity_model_path=str(severity_path) if severity_path.exists() else None,
         device=settings.ML_DEVICE,
         confidence_threshold=settings.ML_CONFIDENCE_THRESHOLD,
+        tile_inference=settings.ML_TILED_INFERENCE,
+        tile_size=settings.ML_TILE_SIZE,
+        tile_overlap=settings.ML_TILE_OVERLAP,
+        max_tiles=settings.ML_MAX_TILES,
     )
     return _detector
 

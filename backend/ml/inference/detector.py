@@ -16,6 +16,8 @@ import numpy as np
 import torch
 from PIL import Image
 
+from ml.inference.tiling import FrameBox, suppress_duplicates, tile_regions
+
 logger = logging.getLogger(__name__)
 
 
@@ -127,6 +129,10 @@ class DefectDetector:
         device: str = "cpu",
         confidence_threshold: float = 0.25,
         image_size: int = 640,
+        tile_inference: bool = False,
+        tile_size: int = 256,
+        tile_overlap: float = 0.20,
+        max_tiles: int = 16,
     ):
         import time
 
@@ -134,6 +140,12 @@ class DefectDetector:
         self.device = device
         self.confidence_threshold = confidence_threshold
         self.image_size = image_size
+        if tile_size < 1 or not 0 <= tile_overlap < 1 or max_tiles < 1:
+            raise ValueError("Invalid inference tile size, overlap, or budget")
+        self.tile_inference = tile_inference
+        self.tile_size = tile_size
+        self.tile_overlap = tile_overlap
+        self.max_tiles = max_tiles
 
         # Load YOLO detector
         logger.info(f"Loading YOLO detector from {detector_path}")
@@ -204,30 +216,9 @@ class DefectDetector:
             raise RuntimeError("Detector unavailable")
         result.model_name = "yolo11"
 
-        # Run YOLO detection
-        yolo_results = self.yolo(
-            image,
-            conf=self.confidence_threshold,
-            imgsz=self.image_size,
-            device=self.device,
-            verbose=False,
-        )
-
-        if not yolo_results or len(yolo_results) == 0:
-            result.inference_time_ms = (time.time() - start) * 1000
-            result.model_name = self.yolo.model_name if hasattr(self.yolo, "model_name") else "yolo"
-            return result
-
-        boxes = yolo_results[0].boxes
-        if boxes is None or len(boxes) == 0:
-            result.inference_time_ms = (time.time() - start) * 1000
-            return result
-
-        # Process each detection
-        for box in boxes:
-            cls_id = int(box.cls[0].item())
-            confidence = float(box.conf[0].item())
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
+        for box in self._frame_boxes(image):
+            cls_id, confidence = box.class_id, box.confidence
+            x1, y1, x2, y2 = box.xyxy
 
             defect_class = CLASS_NAMES.get(cls_id, f"unknown_{cls_id}")
             bbox_w = x2 - x1
@@ -266,6 +257,37 @@ class DefectDetector:
         result.inference_time_ms = (time.time() - start) * 1000
         result.model_name = "yolo11"
         return result
+
+    def _frame_boxes(self, image: Image.Image) -> list[FrameBox]:
+        width, height = image.size
+        full = (0, 0, width, height)
+        options = dict(conf=self.confidence_threshold, imgsz=self.image_size,
+                       device=self.device, verbose=False)
+        boxes = []
+
+        def collect(results, regions):
+            for prediction, (left, top, right, bottom) in zip(results, regions, strict=True):
+                if prediction.boxes is None:
+                    continue
+                for raw in prediction.boxes.data.detach().cpu().tolist():
+                    x1, y1, x2, y2, score, class_id = raw
+                    clipped = ((left > 0 and x1 <= 2) or (top > 0 and y1 <= 2)
+                               or (right < width and x2 >= right - left - 2)
+                               or (bottom < height and y2 >= bottom - top - 2))
+                    x1, x2 = max(left, x1 + left), min(right, x2 + left)
+                    y1, y2 = max(top, y1 + top), min(bottom, y2 + top)
+                    if x2 > x1 and y2 > y1:
+                        boxes.append(FrameBox(int(class_id), score, (x1, y1, x2, y2), clipped))
+
+        collect(self.yolo(image, **options), [full])
+        if not self.tile_inference:
+            return boxes
+        regions = [r for r in tile_regions(width, height, self.tile_size,
+                                            self.tile_overlap, self.max_tiles) if r != full]
+        for start in range(0, len(regions), 4):
+            batch = regions[start:start + 4]
+            collect(self.yolo([image.crop(r) for r in batch], **options), batch)
+        return suppress_duplicates(boxes)
 
     def predict_from_bytes(self, image_bytes: bytes) -> InferenceResult:
         """Run prediction from raw image bytes."""

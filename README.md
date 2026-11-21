@@ -50,6 +50,21 @@ The output records the model, manifest and image hashes, per-class precision and
 - **Mapping:** The mapper back-projects the detection box centre into a world ray. IfcOpenShell provides world-space meshes, frustum culling narrows the candidates, and ray-triangle intersection selects the nearest surface hit. The result records the IFC GlobalId and 3D hit point in metres. Observations of the same class near one another on the same element can be merged.
 - **System:** Next.js and Three.js/web-ifc provide the UI. FastAPI serves inspections and geometry metadata. PostgreSQL stores project, calibration and defect records. Authorized local storage holds IFC and evidence. A standalone worker runs scheduled inspection batches.
 
+### Tiled detection for wide camera views
+
+Set `ML_TILED_INFERENCE=true` in the backend environment and restart the API (and the
+monitoring worker, if used). Each inspected frame gets the usual full-frame YOLO pass
+plus passes over overlapping crops. The detector converts every box back to the
+original image coordinates and suppresses duplicate boxes of the same class before
+severity scoring, drawing overlays, or BIM mapping.
+
+Defaults: `ML_TILE_SIZE=256` source pixels, `ML_TILE_OVERLAP=0.20`, and `ML_MAX_TILES=16`.
+The grid increases the tile size when necessary to keep the full frame covered
+within that budget. The YOLO input size and confidence threshold stay the same
+for all passes. Tiling is off by default: it costs more per frame and can surface
+additional false positives, so compare it on representative positive and clean
+frames before enabling it for a camera workflow.
+
 ## Schependomlaan simulation
 
 The recorded demonstration used the Schependomlaan IFC, a fixed 1280 × 720 virtual camera, one registered ArUco marker, and **two simulated cracks**. The detector used a 0.25 confidence threshold and class-correct matches at intersection over union (IoU) of at least 0.50.

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # ML
     ML_MODEL_PATH: str = "ml/models/defect_detector.pt"
     ML_CONFIDENCE_THRESHOLD: float = Field(default=0.25, ge=0.01, le=1.0)
+    ML_TILED_INFERENCE: bool = False
+    ML_TILE_SIZE: int = Field(default=256, ge=128, le=1024)
+    ML_TILE_OVERLAP: float = Field(default=0.20, ge=0.0, le=0.45)
+    ML_MAX_TILES: int = Field(default=16, ge=1, le=64)
     ML_DEVICE: str = "cpu"
 
     CAMERA_ALLOWED_HOSTS: str = ""
